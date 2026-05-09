@@ -3,12 +3,12 @@ class Enemy {
         this.map = map;
         this.player = player;
         this.width = 24;
-        this.height = 24;
+        this.height = 32;
         this.health = CONFIG.ENEMY_MAX_HEALTH;
         this.speed = CONFIG.ENEMY_SPEED;
         this.damage = CONFIG.ENEMY_DAMAGE;
         this.attackCooldown = 0;
-        this.attackRange = 50;
+        this.attackRange = 40; // 敌人近战攻击范围
         this.detectionRange = 200;
         
         // 随机生成敌人位置（不在墙上，远离玩家）
@@ -67,19 +67,47 @@ class Enemy {
         return this.health <= 0;
     }
     
+    // 绘制像素风格敌人
     draw(ctx, cameraX, cameraY) {
         const screenX = this.x - cameraX;
         const screenY = this.y - cameraY;
         
-        // 绘制敌人（红色方块）
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        
+        // 绘制身体（红色上衣）
         ctx.fillStyle = '#f44336';
-        ctx.fillRect(screenX - this.width / 2, screenY - this.height / 2, this.width, this.height);
+        ctx.fillRect(-8, -8, 16, 16);
+        
+        // 绘制头部（灰色皮肤）
+        ctx.fillStyle = '#bdbdbd';
+        ctx.fillRect(-6, -16, 12, 10);
+        
+        // 绘制眼睛（红色）
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(-4, -12, 2, 2);
+        ctx.fillRect(2, -12, 2, 2);
+        
+        // 绘制腿（深红色裤子）
+        ctx.fillStyle = '#b71c1c';
+        ctx.fillRect(-6, 8, 5, 8);
+        ctx.fillRect(1, 8, 5, 8);
+        
+        // 绘制敌人武器（匕首）
+        const angleToPlayer = Math.atan2(this.player.y - this.y, this.player.x - this.x);
+        ctx.rotate(angleToPlayer);
+        ctx.fillStyle = '#9e9e9e';
+        ctx.fillRect(8, -1, 12, 2);
+        ctx.fillStyle = '#795548';
+        ctx.fillRect(6, -2, 4, 4);
+        
+        ctx.restore();
         
         // 绘制敌人血条
         const healthPercent = this.health / CONFIG.ENEMY_MAX_HEALTH;
         ctx.fillStyle = '#333';
-        ctx.fillRect(screenX - this.width / 2, screenY - this.height / 2 - 10, this.width, 5);
+        ctx.fillRect(screenX - 12, screenY - 24, 24, 4);
         ctx.fillStyle = '#f44336';
-        ctx.fillRect(screenX - this.width / 2, screenY - this.height / 2 - 10, this.width * healthPercent, 5);
+        ctx.fillRect(screenX - 12, screenY - 24, 24 * healthPercent, 4);
     }
 }
