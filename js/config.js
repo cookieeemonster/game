@@ -23,8 +23,13 @@ const CONFIG = {
     
     // 游戏设置
     GAME_TICK: 16, // 约60FPS
-    ITEM_SPAWN_COUNT: 15,
+    ITEM_SPAWN_COUNT: 10,
     EXTRACTION_POINT_COUNT: 2
+};
+    // 武器设置（新增）
+    SWORD_DAMAGE: 25,
+    SWORD_RANGE: 60,
+    SWORD_ATTACK_COOLDOWN: 30 // 0.5秒攻击一次（60FPS）
 };
 
 // 游戏状态枚举
