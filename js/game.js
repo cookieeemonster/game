@@ -137,4 +137,3 @@ class Game {
         this.gameLoop();
     }
 }
-}
