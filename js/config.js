@@ -16,10 +16,9 @@ const CONFIG = {
     ENEMY_SPAWN_COUNT: 10,
     
     // 地图设置
-    MAP_WIDTH: 2560,
-    MAP_HEIGHT: 1440,
+    MAP_WIDTH: 3200,
+    MAP_HEIGHT: 2400,
     TILE_SIZE: 32,
-    WALL_DENSITY: 0.3,
     
     // 游戏设置
     GAME_TICK: 16, // 约60FPS
