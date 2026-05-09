@@ -413,47 +413,47 @@ class Map {
         this.drawBuildingRoofs(ctx, cameraX, cameraY);
     }
     
-    // 绘制立体墙（支持透明度）
-    drawWall(ctx, x, y, alpha = 1) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.globalAlpha = alpha;
-        
-        // 墙的高度
-        const wallHeight = 40;
-        
-        // 左侧面
-        ctx.fillStyle = '#6d4c41';
-        ctx.beginPath();
-        ctx.moveTo(-this.tileSize / 2, this.tileHeight / 2);
-        ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
-        ctx.lineTo(0, -wallHeight);
-        ctx.lineTo(0, 0);
-        ctx.closePath();
-        ctx.fill();
-        
-        // 右侧面
-        ctx.fillStyle = '#8d6e63';
-        ctx.beginPath();
-        ctx.moveTo(this.tileSize / 2, this.tileHeight / 2);
-        ctx.lineTo(this.tileSize / 2, this.tileHeight / 2 - wallHeight);
-        ctx.lineTo(0, -wallHeight);
-        ctx.lineTo(0, 0);
-        ctx.closePath();
-        ctx.fill();
-        
-        // 顶面
-        ctx.fillStyle = '#a1887f';
-        ctx.beginPath();
-        ctx.moveTo(0, -wallHeight);
-        ctx.lineTo(this.tileSize / 2, this.tileHeight / 2 - wallHeight);
-        ctx.lineTo(0, this.tileHeight - wallHeight);
-        ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.restore();
-    }
+// 绘制立体墙（支持透明度，优化顶部对齐）
+drawWall(ctx, x, y, alpha = 1) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalAlpha = alpha;
+    
+    // 墙的高度
+    const wallHeight = 40;
+    
+    // 左侧面
+    ctx.fillStyle = '#6d4c41';
+    ctx.beginPath();
+    ctx.moveTo(-this.tileSize / 2, this.tileHeight / 2);
+    ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
+    ctx.lineTo(0, -wallHeight);
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fill();
+    
+    // 右侧面
+    ctx.fillStyle = '#8d6e63';
+    ctx.beginPath();
+    ctx.moveTo(this.tileSize / 2, this.tileHeight / 2);
+    ctx.lineTo(this.tileSize / 2, this.tileHeight / 2 - wallHeight);
+    ctx.lineTo(0, -wallHeight);
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fill();
+    
+    // 顶面（现在与屋顶底部精确对齐）
+    ctx.fillStyle = '#a1887f';
+    ctx.beginPath();
+    ctx.moveTo(0, -wallHeight);
+    ctx.lineTo(this.tileSize / 2, this.tileHeight / 2 - wallHeight);
+    ctx.lineTo(0, this.tileHeight - wallHeight);
+    ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+}
     
     // 绘制门（支持透明度）
     drawDoor(ctx, x, y, alpha = 1) {
