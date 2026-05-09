@@ -9,37 +9,34 @@ class Game {
         this.cameraX = 0;
         this.cameraY = 0;
         
-        // 初始化游戏对象
         this.map = new Map();
         this.player = new Player(this.map);
         this.enemies = [];
         this.items = [];
         this.ui = new UI(this);
         
-        // 生成敌人
         for (let i = 0; i < CONFIG.ENEMY_SPAWN_COUNT; i++) {
             this.enemies.push(new Enemy(this.map, this.player));
         }
         
-        // 生成物品（只生成医疗包）
         for (let i = 0; i < CONFIG.ITEM_SPAWN_COUNT; i++) {
             this.items.push(new Item(this.map));
         }
     }
     
-    // 更新相机位置（跟随玩家）
+    // 更新相机（等轴测相机）
     updateCamera() {
-        this.cameraX = this.player.x - CONFIG.CANVAS_WIDTH / 2;
-        this.cameraY = this.player.y - CONFIG.CANVAS_HEIGHT / 2;
+        // 转换玩家位置为等轴测坐标
+        const tileX = this.player.x / this.map.tileSize;
+        const tileY = this.player.y / this.map.tileSize;
+        const iso = cartesianToIsometric(tileX, tileY);
         
-        // 限制相机在地图内
-        this.cameraX = clamp(this.cameraX, 0, this.map.width - CONFIG.CANVAS_WIDTH);
-        this.cameraY = clamp(this.cameraY, 0, this.map.height - CONFIG.CANVAS_HEIGHT);
+        this.cameraX = iso.x;
+        this.cameraY = iso.y;
     }
     
-    // 检测玩家与撤离点的碰撞
     checkExtraction() {
-        if (this.enemies.length === 0) { // 只有清除所有敌人才能撤离
+        if (this.enemies.length === 0) {
             const playerRect = this.player.getBoundingRect();
             for (const point of this.map.extractionPoints) {
                 if (rectCollision(playerRect, point)) {
@@ -51,19 +48,17 @@ class Game {
         }
     }
     
-    // 检测玩家与物品的碰撞
     checkItemPickup() {
         const playerRect = this.player.getBoundingRect();
         this.items = this.items.filter(item => {
             if (rectCollision(playerRect, item.getBoundingRect())) {
                 item.pickup(this.player);
-                return false; // 移除已拾取的物品
+                return false;
             }
             return true;
         });
     }
     
-    // 新增：检测玩家近战攻击是否命中敌人
     checkPlayerAttack() {
         if (!this.player.weapon.isAttacking) return;
         
@@ -71,33 +66,27 @@ class Game {
             if (this.player.weapon.checkHit(this.player.x, this.player.y, enemy)) {
                 const isDead = enemy.takeDamage(this.player.weapon.damage);
                 if (isDead) {
-                    // 敌人死亡时可以添加掉落物逻辑
+                    // 敌人死亡掉落
                 }
             }
         });
     }
     
-    // 更新游戏状态
     update() {
         if (this.state !== GAME_STATE.PLAYING) return;
         
         this.player.update();
         this.enemies.forEach(enemy => enemy.update());
         
-        // 检测玩家攻击命中
         this.checkPlayerAttack();
-        
-        // 移除死亡的敌人
         this.enemies = this.enemies.filter(enemy => enemy.health > 0);
         
         this.updateCamera();
         this.checkItemPickup();
         this.checkExtraction();
         
-        // 新增：更新地图探索区域
         this.map.updateExploredArea(this.player.x, this.player.y);
         
-        // 检查玩家是否死亡
         if (this.player.health <= 0) {
             this.state = GAME_STATE.LOSE;
             alert('你被敌人击败了！游戏失败！');
@@ -107,32 +96,35 @@ class Game {
         this.ui.update();
     }
     
-    // 渲染游戏画面
     render() {
-        // 清空画布
         this.ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
         
-        // 绘制地图
+        // 1. 绘制地图地面
         this.map.draw(this.ctx, this.cameraX, this.cameraY);
         
-        // 绘制物品
+        // 2. 绘制物品
         this.items.forEach(item => item.draw(this.ctx, this.cameraX, this.cameraY));
         
-        // 绘制敌人
+        // 3. 绘制敌人（按Y轴排序）
+        this.enemies.sort((a, b) => a.y - b.y);
         this.enemies.forEach(enemy => enemy.draw(this.ctx, this.cameraX, this.cameraY));
         
-        // 绘制玩家
+        // 4. 绘制玩家
         this.player.draw(this.ctx, this.cameraX, this.cameraY);
+        
+        // 5. 绘制立体物体（树、石头、墙）
+        this.map.drawObjects(this.ctx, this.cameraX, this.cameraY);
+        
+        // 6. 绘制撤离点
+        this.map.drawExtractionPoints(this.ctx, this.cameraX, this.cameraY);
     }
     
-    // 游戏主循环
     gameLoop() {
         this.update();
         this.render();
         requestAnimationFrame(() => this.gameLoop());
     }
     
-    // 启动游戏
     start() {
         this.gameLoop();
     }
