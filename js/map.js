@@ -2,8 +2,8 @@ class Map {
     constructor() {
         this.width = CONFIG.MAP_WIDTH;
         this.height = CONFIG.MAP_HEIGHT;
-        this.tileSize = CONFIG.TILE_SIZE;
-        this.tileHeight = CONFIG.TILE_HEIGHT;
+        this.tileSize = CONFIG.TILE_SIZE; // 64
+        this.tileHeight = CONFIG.TILE_HEIGHT; // 32
         
         // 地图数据：0=草地, 1=墙, 2=树, 3=石头, 4=水, 5=建筑地板, 6=门
         this.tiles = [];
@@ -128,7 +128,7 @@ class Map {
                         startTileY: startY,
                         endTileX: startX + templateWidth,
                         endTileY: startY + templateHeight,
-                        entered: false, // 玩家是否进入过
+                        entered: false,
                         template: template
                     });
                     placed = true;
@@ -147,7 +147,7 @@ class Map {
             [1,5,5,5,5,1],
             [1,5,5,5,5,1],
             [1,5,5,5,5,1],
-            [1,1,1,6,1,1] // 6=门
+            [1,1,1,6,1,1]
         ];
     }
     
@@ -161,7 +161,7 @@ class Map {
             [1,5,5,1,1,5,5,1],
             [1,5,5,5,5,5,5,1],
             [1,5,5,5,5,5,5,1],
-            [1,1,1,6,6,1,1,1] // 双开门
+            [1,1,1,6,6,1,1,1]
         ];
     }
     
@@ -203,7 +203,6 @@ class Map {
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
                 const tile = this.tiles[y][x];
-                // 墙、树、石头、水都是碰撞体，门不是
                 if (tile === 1 || tile === 2 || tile === 3 || tile === 4) {
                     this.walls.push({
                         x: x * this.tileSize,
@@ -257,23 +256,11 @@ class Map {
     // 检测玩家是否在建筑内
     updatePlayerInBuilding(playerX, playerY) {
         for (const building of this.buildings) {
-            const wasEntered = building.entered;
             building.entered = (
                 playerX > building.x && playerX < building.x + building.width &&
                 playerY > building.y && playerY < building.y + building.height
             );
-            
-            // 如果玩家刚进入建筑，生成内部敌人和物品
-            if (building.entered && !wasEntered) {
-                this.generateBuildingContent(building);
-            }
         }
-    }
-    
-    // 生成建筑内部内容（敌人和物品）
-    generateBuildingContent(building) {
-        // 这里可以添加建筑内部生成敌人和物品的逻辑
-        // 暂时留空，后续可以扩展
     }
     
     // 绘制等轴测地图地面
@@ -281,38 +268,39 @@ class Map {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
         
-        // 先绘制所有地面瓦片
+        // 按Y轴顺序绘制地面，确保正确的层叠
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
-                const iso = cartesianToIsometric(x, y);
-                const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
-                const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+                // 计算瓦片的等轴测坐标（原点在瓦片底部中心）
+                const isoX = (x - y) * (this.tileSize / 2);
+                const isoY = (x + y) * (this.tileHeight / 2);
                 
-                // 只绘制屏幕内的瓦片
+                const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
+                const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+                
+                // 视口裁剪
                 if (screenX + this.tileSize < 0 || screenX - this.tileSize > CONFIG.CANVAS_WIDTH ||
                     screenY + this.tileHeight < 0 || screenY - this.tileHeight > CONFIG.CANVAS_HEIGHT) {
                     continue;
                 }
                 
                 const tile = this.tiles[y][x];
-                
-                // 绘制地面
                 this.drawTile(ctx, screenX, screenY, tile);
             }
         }
     }
     
-    // 绘制单个等轴测瓦片
+    // 绘制单个等轴测瓦片（原点在底部中心）
     drawTile(ctx, x, y, tile) {
         ctx.save();
         ctx.translate(x, y);
         
-        // 绘制菱形地面
+        // 绘制菱形地面（四个点相对于底部中心）
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(this.tileSize / 2, this.tileHeight / 2);
-        ctx.lineTo(0, this.tileHeight);
-        ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2);
+        ctx.moveTo(0, -this.tileHeight / 2); // 顶部
+        ctx.lineTo(this.tileSize / 2, 0); // 右部
+        ctx.lineTo(0, this.tileHeight / 2); // 底部
+        ctx.lineTo(-this.tileSize / 2, 0); // 左部
         ctx.closePath();
         
         switch (tile) {
@@ -332,10 +320,10 @@ class Map {
                 ctx.strokeStyle = '#64b5f6';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
+                ctx.moveTo(-this.tileSize / 4, -this.tileHeight / 4);
+                ctx.lineTo(this.tileSize / 4, -this.tileHeight / 4);
                 ctx.moveTo(-this.tileSize / 4, this.tileHeight / 4);
                 ctx.lineTo(this.tileSize / 4, this.tileHeight / 4);
-                ctx.moveTo(-this.tileSize / 4, this.tileHeight * 3 / 4);
-                ctx.lineTo(this.tileSize / 4, this.tileHeight * 3 / 4);
                 ctx.stroke();
                 break;
                 
@@ -362,12 +350,14 @@ class Map {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
         
-        // 按Y轴顺序绘制，实现遮挡
+        // 严格按Y轴从下到上绘制，实现完美遮挡
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
-                const iso = cartesianToIsometric(x, y);
-                const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
-                const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+                const isoX = (x - y) * (this.tileSize / 2);
+                const isoY = (x + y) * (this.tileHeight / 2);
+                
+                const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
+                const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
                 
                 if (screenX + this.tileSize < 0 || screenX - this.tileSize > CONFIG.CANVAS_WIDTH ||
                     screenY + this.tileHeight * 3 < 0 || screenY - this.tileHeight * 3 > CONFIG.CANVAS_HEIGHT) {
@@ -376,19 +366,17 @@ class Map {
                 
                 const tile = this.tiles[y][x];
                 
-                // 检查这个瓦片是否在已进入的建筑内
-                let inEnteredBuilding = false;
+                // 检查是否在已进入的建筑内
                 let buildingAlpha = 1;
                 for (const building of this.buildings) {
                     if (x >= building.startTileX && x < building.endTileX &&
                         y >= building.startTileY && y < building.endTileY) {
-                        inEnteredBuilding = building.entered;
                         buildingAlpha = building.entered ? 0.5 : 1;
                         break;
                     }
                 }
                 
-                // 绘制立体物体
+                // 绘制立体物体（所有物体原点都在底部中心，与地面接触）
                 switch (tile) {
                     case 1: // 墙
                         this.drawWall(ctx, screenX, screenY, buildingAlpha);
@@ -409,53 +397,52 @@ class Map {
             }
         }
         
-        // 绘制建筑屋顶
+        // 最后绘制屋顶（在所有物体之上）
         this.drawBuildingRoofs(ctx, cameraX, cameraY);
     }
     
-// 绘制立体墙（支持透明度，优化顶部对齐）
-drawWall(ctx, x, y, alpha = 1) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.globalAlpha = alpha;
+    // 绘制立体墙（原点在底部中心，完全落地）
+    drawWall(ctx, x, y, alpha = 1) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.globalAlpha = alpha;
+        
+        const wallHeight = 40;
+        
+        // 左侧面
+        ctx.fillStyle = '#6d4c41';
+        ctx.beginPath();
+        ctx.moveTo(-this.tileSize / 2, 0); // 左下角
+        ctx.lineTo(-this.tileSize / 2, -wallHeight); // 左上角
+        ctx.lineTo(0, -wallHeight - this.tileHeight / 2); // 顶部中心
+        ctx.lineTo(0, -this.tileHeight / 2); // 底部中心
+        ctx.closePath();
+        ctx.fill();
+        
+        // 右侧面
+        ctx.fillStyle = '#8d6e63';
+        ctx.beginPath();
+        ctx.moveTo(this.tileSize / 2, 0); // 右下角
+        ctx.lineTo(this.tileSize / 2, -wallHeight); // 右上角
+        ctx.lineTo(0, -wallHeight - this.tileHeight / 2); // 顶部中心
+        ctx.lineTo(0, -this.tileHeight / 2); // 底部中心
+        ctx.closePath();
+        ctx.fill();
+        
+        // 顶面
+        ctx.fillStyle = '#a1887f';
+        ctx.beginPath();
+        ctx.moveTo(0, -wallHeight - this.tileHeight / 2); // 顶部
+        ctx.lineTo(this.tileSize / 2, -wallHeight); // 右部
+        ctx.lineTo(0, -wallHeight + this.tileHeight / 2); // 底部
+        ctx.lineTo(-this.tileSize / 2, -wallHeight); // 左部
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+    }
     
-    // 墙的高度
-    const wallHeight = 40;
-    
-    // 左侧面
-    ctx.fillStyle = '#6d4c41';
-    ctx.beginPath();
-    ctx.moveTo(-this.tileSize / 2, this.tileHeight / 2);
-    ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
-    ctx.lineTo(0, -wallHeight);
-    ctx.lineTo(0, 0);
-    ctx.closePath();
-    ctx.fill();
-    
-    // 右侧面
-    ctx.fillStyle = '#8d6e63';
-    ctx.beginPath();
-    ctx.moveTo(this.tileSize / 2, this.tileHeight / 2);
-    ctx.lineTo(this.tileSize / 2, this.tileHeight / 2 - wallHeight);
-    ctx.lineTo(0, -wallHeight);
-    ctx.lineTo(0, 0);
-    ctx.closePath();
-    ctx.fill();
-    
-    // 顶面（现在与屋顶底部精确对齐）
-    ctx.fillStyle = '#a1887f';
-    ctx.beginPath();
-    ctx.moveTo(0, -wallHeight);
-    ctx.lineTo(this.tileSize / 2, this.tileHeight / 2 - wallHeight);
-    ctx.lineTo(0, this.tileHeight - wallHeight);
-    ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
-    ctx.closePath();
-    ctx.fill();
-    
-    ctx.restore();
-}
-    
-    // 绘制门（支持透明度）
+    // 绘制门（原点在底部中心，完全落地）
     drawDoor(ctx, x, y, alpha = 1) {
         ctx.save();
         ctx.translate(x, y);
@@ -480,51 +467,51 @@ drawWall(ctx, x, y, alpha = 1) {
         ctx.restore();
     }
     
-    // 绘制立体树
+    // 绘制立体树（原点在底部中心，完全落地）
     drawTree(ctx, x, y) {
         ctx.save();
         ctx.translate(x, y);
         
-        // 树干
+        // 树干（从地面向上生长）
         ctx.fillStyle = '#5d4037';
-        ctx.fillRect(-4, -20, 8, 30);
+        ctx.fillRect(-4, -30, 8, 30);
         
-        // 树冠（三层）
+        // 树冠（三层，从下往上）
         ctx.fillStyle = '#2e7d32';
         ctx.beginPath();
-        ctx.arc(0, -40, 20, 0, Math.PI * 2);
+        ctx.arc(0, -50, 20, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.fillStyle = '#388e3c';
         ctx.beginPath();
-        ctx.arc(-8, -30, 15, 0, Math.PI * 2);
+        ctx.arc(-8, -40, 15, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.beginPath();
-        ctx.arc(8, -35, 15, 0, Math.PI * 2);
+        ctx.arc(8, -45, 15, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.fillStyle = '#43a047';
         ctx.beginPath();
-        ctx.arc(0, -25, 12, 0, Math.PI * 2);
+        ctx.arc(0, -35, 12, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.restore();
     }
     
-    // 绘制立体石头
+    // 绘制立体石头（原点在底部中心，完全落地，修复浮空问题）
     drawRock(ctx, x, y) {
         ctx.save();
         ctx.translate(x, y);
         
-        // 石头主体
+        // 石头主体（底部与地面齐平）
         ctx.fillStyle = '#9e9e9e';
         ctx.beginPath();
-        ctx.moveTo(-12, 0);
-        ctx.lineTo(-8, -15);
-        ctx.lineTo(5, -20);
-        ctx.lineTo(15, -10);
-        ctx.lineTo(12, 0);
+        ctx.moveTo(-12, 0); // 左下角
+        ctx.lineTo(-8, -15); // 左上角
+        ctx.lineTo(5, -20); // 顶部
+        ctx.lineTo(15, -10); // 右上角
+        ctx.lineTo(12, 0); // 右下角
         ctx.closePath();
         ctx.fill();
         
@@ -541,75 +528,73 @@ drawWall(ctx, x, y, alpha = 1) {
         ctx.restore();
     }
     
-   // 绘制建筑屋顶（支持半透明，完全修复偏移问题）
-drawBuildingRoofs(ctx, cameraX, cameraY) {
-    for (const building of this.buildings) {
-        const alpha = building.entered ? 0.3 : 1; // 进入后屋顶更透明
-        
-        // 获取建筑四个角的笛卡尔坐标
-        const x1 = building.startTileX;
-        const y1 = building.startTileY;
-        const x2 = building.endTileX;
-        const y2 = building.startTileY;
-        const x3 = building.endTileX;
-        const y3 = building.endTileY;
-        const x4 = building.startTileX;
-        const y4 = building.endTileY;
-        
-        // 转换为等轴测屏幕坐标
-        const iso1 = cartesianToIsometric(x1, y1);
-        const iso2 = cartesianToIsometric(x2, y2);
-        const iso3 = cartesianToIsometric(x3, y3);
-        const iso4 = cartesianToIsometric(x4, y4);
-        
-        // 计算相对于相机的屏幕坐标
-        const screenX1 = iso1.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
-        const screenY1 = iso1.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
-        const screenX2 = iso2.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
-        const screenY2 = iso2.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
-        const screenX3 = iso3.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
-        const screenY3 = iso3.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
-        const screenX4 = iso4.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
-        const screenY4 = iso4.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
-        
-        // 屋顶高度
-        const roofHeight = 60;
-        
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        
-        // 绘制屋顶主体（精确覆盖建筑四个角）
-        ctx.fillStyle = '#5d4037';
-        ctx.beginPath();
-        ctx.moveTo((screenX1 + screenX2) / 2, screenY1 - roofHeight); // 屋脊顶部
-        ctx.lineTo(screenX2, screenY2 - roofHeight / 2); // 右上角
-        ctx.lineTo((screenX2 + screenX3) / 2, screenY3 - roofHeight); // 屋脊底部
-        ctx.lineTo(screenX4, screenY4 - roofHeight / 2); // 左下角
-        ctx.closePath();
-        ctx.fill();
-        
-        // 屋顶边缘
-        ctx.strokeStyle = '#3e2723';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // 屋脊（精确沿着建筑中线）
-        ctx.strokeStyle = '#4e342e';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo((screenX1 + screenX2) / 2, screenY1 - roofHeight);
-        ctx.lineTo((screenX2 + screenX3) / 2, screenY3 - roofHeight);
-        ctx.stroke();
-        
-        // 屋顶烟囱（放在左上角位置）
-        ctx.fillStyle = '#795548';
-        const chimneyX = (screenX1 + screenX2) / 2 + (screenX2 - screenX1) / 4;
-        const chimneyY = screenY1 - roofHeight - 15;
-        ctx.fillRect(chimneyX - 5, chimneyY, 10, 20);
-        
-        ctx.restore();
+    // 绘制建筑屋顶（完全修复偏移问题，精确覆盖建筑）
+    drawBuildingRoofs(ctx, cameraX, cameraY) {
+        for (const building of this.buildings) {
+            const alpha = building.entered ? 0.3 : 1;
+            
+            // 获取建筑四个角的瓦片坐标
+            const x1 = building.startTileX;
+            const y1 = building.startTileY;
+            const x2 = building.endTileX - 1;
+            const y2 = building.startTileY;
+            const x3 = building.endTileX - 1;
+            const y3 = building.endTileY - 1;
+            const x4 = building.startTileX;
+            const y4 = building.endTileY - 1;
+            
+            // 转换为等轴测屏幕坐标（原点在底部中心）
+            const getScreenPos = (tx, ty) => {
+                const isoX = (tx - ty) * (this.tileSize / 2);
+                const isoY = (tx + ty) * (this.tileHeight / 2);
+                return {
+                    x: isoX - cameraX + CONFIG.CANVAS_WIDTH / 2,
+                    y: isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2
+                };
+            };
+            
+            const p1 = getScreenPos(x1, y1); // 左上角瓦片
+            const p2 = getScreenPos(x2, y2); // 右上角瓦片
+            const p3 = getScreenPos(x3, y3); // 右下角瓦片
+            const p4 = getScreenPos(x4, y4); // 左下角瓦片
+            
+            const roofHeight = 60;
+            
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            
+            // 绘制屋顶主体（精确覆盖建筑四个角的顶部）
+            ctx.fillStyle = '#5d4037';
+            ctx.beginPath();
+            ctx.moveTo((p1.x + p2.x) / 2, p1.y - this.tileHeight / 2 - roofHeight); // 屋脊顶部
+            ctx.lineTo(p2.x, p2.y - roofHeight / 2); // 右上角
+            ctx.lineTo((p2.x + p3.x) / 2, p3.y - this.tileHeight / 2 - roofHeight); // 屋脊底部
+            ctx.lineTo(p4.x, p4.y - roofHeight / 2); // 左下角
+            ctx.closePath();
+            ctx.fill();
+            
+            // 屋顶边缘
+            ctx.strokeStyle = '#3e2723';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 屋脊
+            ctx.strokeStyle = '#4e342e';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo((p1.x + p2.x) / 2, p1.y - this.tileHeight / 2 - roofHeight);
+            ctx.lineTo((p2.x + p3.x) / 2, p3.y - this.tileHeight / 2 - roofHeight);
+            ctx.stroke();
+            
+            // 烟囱
+            ctx.fillStyle = '#795548';
+            const chimneyX = (p1.x + p2.x) / 2 + (p2.x - p1.x) / 4;
+            const chimneyY = p1.y - this.tileHeight / 2 - roofHeight - 15;
+            ctx.fillRect(chimneyX - 5, chimneyY, 10, 20);
+            
+            ctx.restore();
+        }
     }
-}
     
     // 绘制撤离点
     drawExtractionPoints(ctx, cameraX, cameraY) {
@@ -618,9 +603,12 @@ drawBuildingRoofs(ctx, cameraX, cameraY) {
         this.extractionPoints.forEach(point => {
             const tileX = point.x / this.tileSize;
             const tileY = point.y / this.tileSize;
-            const iso = cartesianToIsometric(tileX, tileY);
-            const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
-            const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+            
+            const isoX = (tileX - tileY) * (this.tileSize / 2);
+            const isoY = (tileX + tileY) * (this.tileHeight / 2);
+            
+            const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
+            const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
             
             // 绘制菱形撤离点
             ctx.beginPath();
