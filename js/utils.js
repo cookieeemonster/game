@@ -25,3 +25,33 @@ function rectCollision(rect1, rect2) {
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
+
+// 笛卡尔坐标转等轴测屏幕坐标
+function cartesianToIsometric(x, y) {
+    return {
+        x: (x - y) * (CONFIG.TILE_SIZE / 2),
+        y: (x + y) * (CONFIG.TILE_HEIGHT / 2)
+    };
+}
+
+// 等轴测屏幕坐标转笛卡尔坐标
+function isometricToCartesian(screenX, screenY) {
+    return {
+        x: (screenX / (CONFIG.TILE_SIZE / 2) + screenY / (CONFIG.TILE_HEIGHT / 2)) / 2,
+        y: (screenY / (CONFIG.TILE_HEIGHT / 2) - screenX / (CONFIG.TILE_SIZE / 2)) / 2
+    };
+}
+
+// 计算两个点之间的曼哈顿距离（等轴测中更准确）
+function manhattanDistance(x1, y1, x2, y2) {
+    return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+}
+
+// 根据角度获取方向枚举
+function angleToDirection(angle) {
+    // 将角度转换为0-2π
+    angle = (angle + Math.PI * 2) % (Math.PI * 2);
+    // 每个方向45度
+    const step = Math.PI / 4;
+    return Math.floor((angle + step / 2) / step) % 8;
+}
