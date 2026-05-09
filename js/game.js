@@ -94,6 +94,9 @@ class Game {
         this.checkItemPickup();
         this.checkExtraction();
         
+        // 新增：更新地图探索区域
+        this.map.updateExploredArea(this.player.x, this.player.y);
+        
         // 检查玩家是否死亡
         if (this.player.health <= 0) {
             this.state = GAME_STATE.LOSE;
