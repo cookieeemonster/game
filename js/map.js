@@ -3,13 +3,14 @@ class Map {
         this.width = CONFIG.MAP_WIDTH;
         this.height = CONFIG.MAP_HEIGHT;
         this.tileSize = CONFIG.TILE_SIZE;
+        this.tileHeight = CONFIG.TILE_HEIGHT;
         
-        // 地图数据：0=空地, 1=墙, 2=树, 3=石头, 4=水, 5=建筑地板
+        // 地图数据：0=草地, 1=墙, 2=树, 3=石头, 4=水, 5=建筑地板
         this.tiles = [];
-        this.walls = []; // 所有碰撞体（墙、树、石头、水）
-        this.buildings = []; // 所有建筑
+        this.walls = [];
+        this.buildings = [];
         this.extractionPoints = [];
-        this.exploredTiles = new Set(); // 已探索的室内区域
+        this.exploredTiles = new Set();
         
         this.initializeEmptyMap();
         this.generateNaturalTerrain();
@@ -26,7 +27,6 @@ class Map {
         for (let y = 0; y < rows; y++) {
             this.tiles[y] = [];
             for (let x = 0; x < cols; x++) {
-                // 边缘是墙
                 if (x === 0 || x === cols - 1 || y === 0 || y === rows - 1) {
                     this.tiles[y][x] = 1;
                 } else {
@@ -36,49 +36,48 @@ class Map {
         }
     }
     
-    // 生成自然地形（树木、石头、河流）
+    // 生成自然地形
     generateNaturalTerrain() {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
         
-        // 生成河流（横向）
+        // 生成河流
         const riverY = randomInt(Math.floor(rows * 0.3), Math.floor(rows * 0.7));
         for (let x = 2; x < cols - 2; x++) {
-            // 河流有轻微弯曲
             const offset = Math.floor(Math.sin(x * 0.2) * 2);
             for (let dy = -1; dy <= 1; dy++) {
                 const y = riverY + offset + dy;
                 if (y > 1 && y < rows - 2) {
-                    this.tiles[y][x] = 4; // 水
+                    this.tiles[y][x] = 4;
                 }
             }
         }
         
-        // 生成桥梁（3座）
+        // 生成桥梁
         for (let i = 0; i < 3; i++) {
             const bridgeX = randomInt(Math.floor(cols * 0.2), Math.floor(cols * 0.8));
             for (let dy = -1; dy <= 1; dy++) {
                 const y = riverY + Math.floor(Math.sin(bridgeX * 0.2) * 2) + dy;
                 if (y > 1 && y < rows - 2) {
-                    this.tiles[y][bridgeX] = 0; // 桥是空地
+                    this.tiles[y][bridgeX] = 0;
                 }
             }
         }
         
-        // 生成树林（低密度）
+        // 生成树林
         for (let y = 2; y < rows - 2; y++) {
             for (let x = 2; x < cols - 2; x++) {
-                if (this.tiles[y][x] === 0 && Math.random() < 0.08) {
-                    this.tiles[y][x] = 2; // 树
+                if (this.tiles[y][x] === 0 && Math.random() < 0.06) {
+                    this.tiles[y][x] = 2;
                 }
             }
         }
         
-        // 生成石头堆（更低密度）
+        // 生成石头
         for (let y = 2; y < rows - 2; y++) {
             for (let x = 2; x < cols - 2; x++) {
-                if (this.tiles[y][x] === 0 && Math.random() < 0.03) {
-                    this.tiles[y][x] = 3; // 石头
+                if (this.tiles[y][x] === 0 && Math.random() < 0.02) {
+                    this.tiles[y][x] = 3;
                 }
             }
         }
@@ -88,9 +87,8 @@ class Map {
     generateBuildings() {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
-        const buildingCount = 6; // 生成6个建筑
+        const buildingCount = 5;
         
-        // 建筑模板
         const buildingTemplates = [
             this.createSmallHouseTemplate(),
             this.createWarehouseTemplate(),
@@ -98,12 +96,10 @@ class Map {
         ];
         
         for (let i = 0; i < buildingCount; i++) {
-            // 随机选择建筑模板
             const template = buildingTemplates[randomInt(0, buildingTemplates.length - 1)];
             const templateWidth = template[0].length;
             const templateHeight = template.length;
             
-            // 寻找合适的放置位置
             let placed = false;
             let attempts = 0;
             
@@ -111,11 +107,10 @@ class Map {
                 const startX = randomInt(5, cols - templateWidth - 5);
                 const startY = randomInt(5, rows - templateHeight - 5);
                 
-                // 检查位置是否可用（不能在水上，不能与其他建筑重叠）
                 let canPlace = true;
                 for (let y = 0; y < templateHeight; y++) {
                     for (let x = 0; x < templateWidth; x++) {
-                        if (this.tiles[startY + y][startX + x] === 4) { // 不能在水上
+                        if (this.tiles[startY + y][startX + x] === 4) {
                             canPlace = false;
                             break;
                         }
@@ -124,14 +119,14 @@ class Map {
                 }
                 
                 if (canPlace) {
-                    // 放置建筑
                     this.placeBuilding(template, startX, startY);
                     this.buildings.push({
                         x: startX * this.tileSize,
                         y: startY * this.tileSize,
                         width: templateWidth * this.tileSize,
                         height: templateHeight * this.tileSize,
-                        explored: false
+                        explored: false,
+                        template: template
                     });
                     placed = true;
                 }
@@ -141,8 +136,20 @@ class Map {
         }
     }
     
-    // 小木屋模板（8x8）
+    // 小木屋模板
     createSmallHouseTemplate() {
+        return [
+            [1,1,1,1,1,1],
+            [1,5,5,5,5,1],
+            [1,5,5,5,5,1],
+            [1,5,5,5,5,1],
+            [1,5,5,5,5,1],
+            [1,1,1,0,1,1]
+        ];
+    }
+    
+    // 大仓库模板
+    createWarehouseTemplate() {
         return [
             [1,1,1,1,1,1,1,1],
             [1,5,5,5,5,5,5,1],
@@ -151,45 +158,27 @@ class Map {
             [1,5,5,1,1,5,5,1],
             [1,5,5,5,5,5,5,1],
             [1,5,5,5,5,5,5,1],
-            [1,1,1,0,0,1,1,1] // 底部有2格宽的门
+            [1,1,1,0,0,1,1,1]
         ];
     }
     
-    // 大仓库模板（12x10）
-    createWarehouseTemplate() {
-        return [
-            [1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,5,5,5,5,5,5,5,5,5,5,1],
-            [1,5,5,5,5,5,5,5,5,5,5,1],
-            [1,5,5,1,1,1,1,1,1,5,5,1],
-            [1,5,5,1,5,5,5,5,1,5,5,1],
-            [1,5,5,1,5,5,5,5,1,5,5,1],
-            [1,5,5,1,1,0,0,1,1,5,5,1],
-            [1,5,5,5,5,5,5,5,5,5,5,1],
-            [1,5,5,5,5,5,5,5,5,5,5,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1]
-        ];
-    }
-    
-    // 两层楼房模板（10x12）
+    // 两层楼房模板
     createTwoStoryHouseTemplate() {
         return [
-            [1,1,1,1,1,1,1,1,1,1],
-            [1,5,5,5,1,1,5,5,5,1],
-            [1,5,5,5,1,1,5,5,5,1],
-            [1,5,5,5,5,5,5,5,5,1],
-            [1,5,5,5,5,5,5,5,5,1],
-            [1,1,1,1,5,5,1,1,1,1],
-            [1,1,1,1,5,5,1,1,1,1],
-            [1,5,5,5,5,5,5,5,5,1],
-            [1,5,5,5,5,5,5,5,5,1],
-            [1,5,5,5,1,1,5,5,5,1],
-            [1,5,5,5,1,1,5,5,5,1],
-            [1,1,1,0,0,1,1,1,1,1] // 底部2格宽的门
+            [1,1,1,1,1,1,1,1],
+            [1,5,5,1,1,5,5,1],
+            [1,5,5,1,1,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,1,1,5,5,1,1,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,1,1,5,5,1],
+            [1,1,1,0,0,1,1,1]
         ];
     }
     
-    // 放置建筑到地图
+    // 放置建筑
     placeBuilding(template, startX, startY) {
         const templateHeight = template.length;
         const templateWidth = template[0].length;
@@ -211,7 +200,6 @@ class Map {
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
                 const tile = this.tiles[y][x];
-                // 墙、树、石头、水都是碰撞体
                 if (tile === 1 || tile === 2 || tile === 3 || tile === 4) {
                     this.walls.push({
                         x: x * this.tileSize,
@@ -224,7 +212,7 @@ class Map {
         }
     }
     
-    // 生成撤离点（只在室外）
+    // 生成撤离点
     generateExtractionPoints() {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
@@ -238,7 +226,6 @@ class Map {
                 const tileX = randomInt(5, cols - 5);
                 const tileY = randomInt(5, rows - 5);
                 
-                // 撤离点必须在空地上，不能在建筑内
                 if (this.tiles[tileY][tileX] === 0) {
                     x = tileX * this.tileSize;
                     y = tileY * this.tileSize;
@@ -258,21 +245,19 @@ class Map {
         }
     }
     
-    // 检测是否与碰撞体碰撞
+    // 碰撞检测（保持原逻辑不变）
     isColliding(rect) {
         return this.walls.some(wall => rectCollision(rect, wall));
     }
     
-    // 更新已探索区域（玩家进入建筑时调用）
+    // 更新探索区域
     updateExploredArea(playerX, playerY) {
         const playerTileX = Math.floor(playerX / this.tileSize);
         const playerTileY = Math.floor(playerY / this.tileSize);
         
-        // 检查玩家是否在建筑内
         for (const building of this.buildings) {
             if (playerX > building.x && playerX < building.x + building.width &&
                 playerY > building.y && playerY < building.y + building.height) {
-                // 标记整个建筑为已探索
                 const startTileX = Math.floor(building.x / this.tileSize);
                 const startTileY = Math.floor(building.y / this.tileSize);
                 const endTileX = Math.floor((building.x + building.width) / this.tileSize);
@@ -288,26 +273,97 @@ class Map {
         }
     }
     
-    // 绘制地图
+    // 绘制等轴测地图
     draw(ctx, cameraX, cameraY) {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
         
-        // 计算可见区域
-        const startTileX = Math.max(0, Math.floor(cameraX / this.tileSize) - 1);
-        const endTileX = Math.min(cols, Math.floor((cameraX + CONFIG.CANVAS_WIDTH) / this.tileSize) + 1);
-        const startTileY = Math.max(0, Math.floor(cameraY / this.tileSize) - 1);
-        const endTileY = Math.min(rows, Math.floor((cameraY + CONFIG.CANVAS_HEIGHT) / this.tileSize) + 1);
+        // 先绘制所有地面瓦片
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const iso = cartesianToIsometric(x, y);
+                const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+                const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+                
+                // 只绘制屏幕内的瓦片
+                if (screenX + this.tileSize < 0 || screenX - this.tileSize > CONFIG.CANVAS_WIDTH ||
+                    screenY + this.tileHeight < 0 || screenY - this.tileHeight > CONFIG.CANVAS_HEIGHT) {
+                    continue;
+                }
+                
+                const tile = this.tiles[y][x];
+                
+                // 绘制地面
+                this.drawTile(ctx, screenX, screenY, tile);
+            }
+        }
+    }
+    
+    // 绘制单个等轴测瓦片
+    drawTile(ctx, x, y, tile) {
+        ctx.save();
+        ctx.translate(x, y);
         
-        // 绘制地面
-        ctx.fillStyle = '#4a7c59'; // 草地绿色
-        ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        // 绘制菱形地面
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(this.tileSize / 2, this.tileHeight / 2);
+        ctx.lineTo(0, this.tileHeight);
+        ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2);
+        ctx.closePath();
         
-        // 绘制瓦片
-        for (let y = startTileY; y < endTileY; y++) {
-            for (let x = startTileX; x < endTileX; x++) {
-                const screenX = x * this.tileSize - cameraX;
-                const screenY = y * this.tileSize - cameraY;
+        switch (tile) {
+            case 0: // 草地
+                ctx.fillStyle = '#4a7c59';
+                ctx.fill();
+                ctx.strokeStyle = '#3d6b4a';
+                ctx.stroke();
+                break;
+                
+            case 4: // 水
+                ctx.fillStyle = '#2196f3';
+                ctx.fill();
+                ctx.strokeStyle = '#1976d2';
+                ctx.stroke();
+                // 水波纹
+                ctx.strokeStyle = '#64b5f6';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-this.tileSize / 4, this.tileHeight / 4);
+                ctx.lineTo(this.tileSize / 4, this.tileHeight / 4);
+                ctx.moveTo(-this.tileSize / 4, this.tileHeight * 3 / 4);
+                ctx.lineTo(this.tileSize / 4, this.tileHeight * 3 / 4);
+                ctx.stroke();
+                break;
+                
+            case 5: // 建筑地板
+                ctx.fillStyle = '#d7ccc8';
+                ctx.fill();
+                ctx.strokeStyle = '#bcaaa4';
+                ctx.stroke();
+                break;
+        }
+        
+        ctx.restore();
+    }
+    
+    // 绘制立体物体（树、石头、建筑）
+    drawObjects(ctx, cameraX, cameraY) {
+        const cols = Math.floor(this.width / this.tileSize);
+        const rows = Math.floor(this.height / this.tileSize);
+        
+        // 按Y轴顺序绘制，实现遮挡
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const iso = cartesianToIsometric(x, y);
+                const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+                const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+                
+                if (screenX + this.tileSize < 0 || screenX - this.tileSize > CONFIG.CANVAS_WIDTH ||
+                    screenY + this.tileHeight * 3 < 0 || screenY - this.tileHeight * 3 > CONFIG.CANVAS_HEIGHT) {
+                    continue;
+                }
+                
                 const tile = this.tiles[y][x];
                 
                 // 检查是否是未探索的室内区域
@@ -326,76 +382,204 @@ class Map {
                     }
                 }
                 
-                if (isUnexploredIndoor) {
-                    // 未探索的室内显示为黑色
-                    ctx.fillStyle = '#000';
-                    ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
-                    continue;
-                }
+                if (isUnexploredIndoor) continue;
                 
-                // 根据瓦片类型绘制
+                // 绘制立体物体
                 switch (tile) {
                     case 1: // 墙
-                        ctx.fillStyle = '#795548';
-                        ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
-                        ctx.strokeStyle = '#5d4037';
-                        ctx.strokeRect(screenX, screenY, this.tileSize, this.tileSize);
+                        this.drawWall(ctx, screenX, screenY);
                         break;
                         
                     case 2: // 树
-                        ctx.fillStyle = '#2e7d32';
-                        ctx.beginPath();
-                        ctx.arc(screenX + this.tileSize/2, screenY + this.tileSize/2, this.tileSize/2 - 2, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.fillStyle = '#1b5e20';
-                        ctx.beginPath();
-                        ctx.arc(screenX + this.tileSize/2, screenY + this.tileSize/2 - 4, this.tileSize/3, 0, Math.PI * 2);
-                        ctx.fill();
+                        this.drawTree(ctx, screenX, screenY);
                         break;
                         
                     case 3: // 石头
-                        ctx.fillStyle = '#9e9e9e';
-                        ctx.fillRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
-                        ctx.fillStyle = '#757575';
-                        ctx.fillRect(screenX + 6, screenY + 6, this.tileSize - 12, this.tileSize - 12);
-                        break;
-                        
-                    case 4: // 水
-                        ctx.fillStyle = '#2196f3';
-                        ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
-                        // 水波纹效果
-                        ctx.strokeStyle = '#64b5f6';
-                        ctx.lineWidth = 1;
-                        ctx.beginPath();
-                        ctx.moveTo(screenX, screenY + this.tileSize/3);
-                        ctx.lineTo(screenX + this.tileSize, screenY + this.tileSize/3);
-                        ctx.moveTo(screenX, screenY + this.tileSize*2/3);
-                        ctx.lineTo(screenX + this.tileSize, screenY + this.tileSize*2/3);
-                        ctx.stroke();
-                        break;
-                        
-                    case 5: // 建筑地板
-                        ctx.fillStyle = '#d7ccc8';
-                        ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
-                        ctx.strokeStyle = '#bcaaa4';
-                        ctx.strokeRect(screenX, screenY, this.tileSize, this.tileSize);
+                        this.drawRock(ctx, screenX, screenY);
                         break;
                 }
             }
         }
         
-        // 绘制撤离点（绿色闪烁效果）
+        // 绘制建筑屋顶（在所有物体之后）
+        this.drawBuildingRoofs(ctx, cameraX, cameraY);
+    }
+    
+    // 绘制立体墙
+    drawWall(ctx, x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // 墙的高度
+        const wallHeight = 40;
+        
+        // 左侧面
+        ctx.fillStyle = '#6d4c41';
+        ctx.beginPath();
+        ctx.moveTo(-this.tileSize / 2, this.tileHeight / 2);
+        ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
+        ctx.lineTo(0, -wallHeight);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 右侧面
+        ctx.fillStyle = '#8d6e63';
+        ctx.beginPath();
+        ctx.moveTo(this.tileSize / 2, this.tileHeight / 2);
+        ctx.lineTo(this.tileSize / 2, this.tileHeight / 2 - wallHeight);
+        ctx.lineTo(0, -wallHeight);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 顶面
+        ctx.fillStyle = '#a1887f';
+        ctx.beginPath();
+        ctx.moveTo(0, -wallHeight);
+        ctx.lineTo(this.tileSize / 2, this.tileHeight / 2 - wallHeight);
+        ctx.lineTo(0, this.tileHeight - wallHeight);
+        ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+    }
+    
+    // 绘制立体树
+    drawTree(ctx, x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // 树干
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(-4, -20, 8, 30);
+        
+        // 树冠（三层）
+        ctx.fillStyle = '#2e7d32';
+        ctx.beginPath();
+        ctx.arc(0, -40, 20, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#388e3c';
+        ctx.beginPath();
+        ctx.arc(-8, -30, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(8, -35, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#43a047';
+        ctx.beginPath();
+        ctx.arc(0, -25, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+    
+    // 绘制立体石头
+    drawRock(ctx, x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // 石头主体
+        ctx.fillStyle = '#9e9e9e';
+        ctx.beginPath();
+        ctx.moveTo(-12, 0);
+        ctx.lineTo(-8, -15);
+        ctx.lineTo(5, -20);
+        ctx.lineTo(15, -10);
+        ctx.lineTo(12, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 石头阴影
+        ctx.fillStyle = '#757575';
+        ctx.beginPath();
+        ctx.moveTo(-12, 0);
+        ctx.lineTo(-8, -15);
+        ctx.lineTo(0, -10);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+    }
+    
+    // 绘制建筑屋顶
+    drawBuildingRoofs(ctx, cameraX, cameraY) {
+        for (const building of this.buildings) {
+            if (building.explored) continue; // 已探索的建筑不显示屋顶
+            
+            const startTileX = Math.floor(building.x / this.tileSize);
+            const startTileY = Math.floor(building.y / this.tileSize);
+            const endTileX = Math.floor((building.x + building.width) / this.tileSize);
+            const endTileY = Math.floor((building.y + building.height) / this.tileSize);
+            
+            // 计算建筑中心的等轴测坐标
+            const centerX = (startTileX + endTileX) / 2;
+            const centerY = (startTileY + endTileY) / 2;
+            const iso = cartesianToIsometric(centerX, centerY);
+            const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+            const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+            
+            // 建筑尺寸
+            const width = (endTileX - startTileX) * this.tileSize / 2;
+            const height = (endTileY - startTileY) * this.tileHeight / 2;
+            const roofHeight = 60;
+            
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            
+            // 绘制屋顶
+            ctx.fillStyle = '#5d4037';
+            ctx.beginPath();
+            ctx.moveTo(0, -roofHeight);
+            ctx.lineTo(width, height - roofHeight);
+            ctx.lineTo(0, height * 2 - roofHeight);
+            ctx.lineTo(-width, height - roofHeight);
+            ctx.closePath();
+            ctx.fill();
+            
+            // 屋顶边缘
+            ctx.strokeStyle = '#3e2723';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 绘制门的标记
+            ctx.fillStyle = '#795548';
+            ctx.fillRect(-10, height - 10, 20, 20);
+            
+            ctx.restore();
+        }
+    }
+    
+    // 绘制撤离点
+    drawExtractionPoints(ctx, cameraX, cameraY) {
         ctx.fillStyle = `rgba(76, 175, 80, ${0.5 + Math.sin(Date.now() / 500) * 0.3})`;
+        
         this.extractionPoints.forEach(point => {
-            const screenX = point.x - cameraX;
-            const screenY = point.y - cameraY;
-            ctx.fillRect(screenX, screenY, point.width, point.height);
+            const tileX = point.x / this.tileSize;
+            const tileY = point.y / this.tileSize;
+            const iso = cartesianToIsometric(tileX, tileY);
+            const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+            const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+            
+            // 绘制菱形撤离点
+            ctx.beginPath();
+            ctx.moveTo(screenX, screenY - this.tileHeight);
+            ctx.lineTo(screenX + this.tileSize, screenY);
+            ctx.lineTo(screenX, screenY + this.tileHeight);
+            ctx.lineTo(screenX - this.tileSize, screenY);
+            ctx.closePath();
+            ctx.fill();
             
             // 撤离点文字
             ctx.fillStyle = '#fff';
             ctx.font = '16px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('撤离点', screenX + point.width/2, screenY + point.height/2 + 5);
+            ctx.fillText('撤离点', screenX, screenY + 5);
         });
     }
 }
