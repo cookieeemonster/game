@@ -17,14 +17,14 @@ class UI {
         healthBar.appendChild(healthFill);
         this.uiLayer.appendChild(healthBar);
         
-        // 绘制弹药数
-        const ammoText = document.createElement('div');
-        ammoText.style.position = 'absolute';
-        ammoText.style.top = '50px';
-        ammoText.style.left = '20px';
-        ammoText.style.fontSize = '20px';
-        ammoText.textContent = `弹药: ${this.game.player.ammo}`;
-        this.uiLayer.appendChild(ammoText);
+        // 绘制武器信息
+        const weaponText = document.createElement('div');
+        weaponText.style.position = 'absolute';
+        weaponText.style.top = '50px';
+        weaponText.style.left = '20px';
+        weaponText.style.fontSize = '20px';
+        weaponText.textContent = `武器: ${this.game.player.weapon.name}`;
+        this.uiLayer.appendChild(weaponText);
         
         // 绘制敌人数量
         const enemyText = document.createElement('div');
