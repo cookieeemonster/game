@@ -2,21 +2,26 @@ class Enemy {
     constructor(map, player) {
         this.map = map;
         this.player = player;
-        this.width = 24;
+        this.width = 32;
         this.height = 32;
         this.health = CONFIG.ENEMY_MAX_HEALTH;
         this.speed = CONFIG.ENEMY_SPEED;
         this.damage = CONFIG.ENEMY_DAMAGE;
         this.attackCooldown = 0;
-        this.attackRange = 40; // 敌人近战攻击范围
-        this.detectionRange = 200;
+        this.attackRange = 50;
+        this.detectionRange = 250;
         
-        // 随机生成敌人位置（不在墙上，远离玩家）
+        // 动画系统
+        this.animationFrame = 0;
+        this.animationSpeed = 0.1;
+        this.isMoving = false;
+        
+        // 随机生成位置
         do {
             this.x = randomInt(this.map.tileSize * 2, this.map.width - this.map.tileSize * 2);
             this.y = randomInt(this.map.tileSize * 2, this.map.height - this.map.tileSize * 2);
         } while (this.map.isColliding(this.getBoundingRect()) || 
-                 distance(this.x, this.y, player.x, player.y) < 300);
+                 distance(this.x, this.y, player.x, player.y) < 400);
     }
     
     getBoundingRect() {
@@ -31,13 +36,13 @@ class Enemy {
     update() {
         const distToPlayer = distance(this.x, this.y, this.player.x, this.player.y);
         
-        // 如果玩家在检测范围内，追踪玩家
+        this.isMoving = false;
+        
         if (distToPlayer < this.detectionRange) {
             const angle = Math.atan2(this.player.y - this.y, this.player.x - this.x);
             const dx = Math.cos(angle) * this.speed;
             const dy = Math.sin(angle) * this.speed;
             
-            // 尝试移动
             const newX = this.x + dx;
             const newY = this.y + dy;
             const testRect = this.getBoundingRect();
@@ -47,18 +52,27 @@ class Enemy {
             if (!this.map.isColliding(testRect)) {
                 this.x = newX;
                 this.y = newY;
+                this.isMoving = true;
             }
             
-            // 如果在攻击范围内，攻击玩家
             if (distToPlayer < this.attackRange && this.attackCooldown <= 0) {
                 this.player.takeDamage(this.damage);
-                this.attackCooldown = 60; // 1秒攻击一次（60FPS）
+                this.attackCooldown = 60;
             }
         }
         
-        // 减少攻击冷却
         if (this.attackCooldown > 0) {
             this.attackCooldown--;
+        }
+        
+        // 更新动画
+        if (this.isMoving) {
+            this.animationFrame += this.animationSpeed;
+            if (this.animationFrame >= 4) {
+                this.animationFrame = 0;
+            }
+        } else {
+            this.animationFrame = 0;
         }
     }
     
@@ -67,47 +81,59 @@ class Enemy {
         return this.health <= 0;
     }
     
-    // 绘制像素风格敌人
     draw(ctx, cameraX, cameraY) {
-        const screenX = this.x - cameraX;
-        const screenY = this.y - cameraY;
+        const tileX = this.x / this.map.tileSize;
+        const tileY = this.y / this.map.tileSize;
+        const iso = cartesianToIsometric(tileX, tileY);
+        const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+        const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
         
         ctx.save();
         ctx.translate(screenX, screenY);
         
-        // 绘制身体（红色上衣）
-        ctx.fillStyle = '#f44336';
-        ctx.fillRect(-8, -8, 16, 16);
+        const frame = Math.floor(this.animationFrame);
+        const legOffset = Math.sin(frame * Math.PI / 2) * 2;
         
-        // 绘制头部（灰色皮肤）
-        ctx.fillStyle = '#bdbdbd';
-        ctx.fillRect(-6, -16, 12, 10);
-        
-        // 绘制眼睛（红色）
-        ctx.fillStyle = '#ff0000';
-        ctx.fillRect(-4, -12, 2, 2);
-        ctx.fillRect(2, -12, 2, 2);
-        
-        // 绘制腿（深红色裤子）
+        // 腿部
         ctx.fillStyle = '#b71c1c';
-        ctx.fillRect(-6, 8, 5, 8);
-        ctx.fillRect(1, 8, 5, 8);
+        ctx.fillRect(-6, 0 + legOffset, 5, 12);
+        ctx.fillRect(1, 0 - legOffset, 5, 12);
         
-        // 绘制敌人武器（匕首）
+        // 身体
+        ctx.fillStyle = '#f44336';
+        ctx.fillRect(-8, -16, 16, 16);
+        
+        // 手臂
+        ctx.fillStyle = '#d32f2f';
+        ctx.fillRect(-12, -14, 4, 10);
+        ctx.fillRect(8, -14, 4, 10);
+        
+        // 头部
+        ctx.fillStyle = '#bdbdbd';
+        ctx.fillRect(-6, -32, 12, 16);
+        
+        // 眼睛
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(-4, -26, 2, 2);
+        ctx.fillRect(2, -26, 2, 2);
+        
+        // 武器（匕首）
         const angleToPlayer = Math.atan2(this.player.y - this.y, this.player.x - this.x);
+        ctx.save();
         ctx.rotate(angleToPlayer);
         ctx.fillStyle = '#9e9e9e';
-        ctx.fillRect(8, -1, 12, 2);
+        ctx.fillRect(10, -1, 16, 2);
         ctx.fillStyle = '#795548';
         ctx.fillRect(6, -2, 4, 4);
+        ctx.restore();
         
         ctx.restore();
         
-        // 绘制敌人血条
+        // 血条
         const healthPercent = this.health / CONFIG.ENEMY_MAX_HEALTH;
         ctx.fillStyle = '#333';
-        ctx.fillRect(screenX - 12, screenY - 24, 24, 4);
+        ctx.fillRect(screenX - 16, screenY - 45, 32, 4);
         ctx.fillStyle = '#f44336';
-        ctx.fillRect(screenX - 12, screenY - 24, 24 * healthPercent, 4);
+        ctx.fillRect(screenX - 16, screenY - 45, 32 * healthPercent, 4);
     }
 }
