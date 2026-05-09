@@ -541,55 +541,75 @@ class Map {
         ctx.restore();
     }
     
-    // 绘制建筑屋顶（支持半透明）
-    drawBuildingRoofs(ctx, cameraX, cameraY) {
-        for (const building of this.buildings) {
-            const alpha = building.entered ? 0.3 : 1; // 进入后屋顶更透明
-            
-            const centerX = (building.startTileX + building.endTileX) / 2;
-            const centerY = (building.startTileY + building.endTileY) / 2;
-            const iso = cartesianToIsometric(centerX, centerY);
-            const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
-            const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
-            
-            const width = (building.endTileX - building.startTileX) * this.tileSize / 2;
-            const height = (building.endTileY - building.startTileY) * this.tileHeight / 2;
-            const roofHeight = 60;
-            
-            ctx.save();
-            ctx.translate(screenX, screenY);
-            ctx.globalAlpha = alpha;
-            
-            // 绘制屋顶主体
-            ctx.fillStyle = '#5d4037';
-            ctx.beginPath();
-            ctx.moveTo(0, -roofHeight);
-            ctx.lineTo(width, height - roofHeight);
-            ctx.lineTo(0, height * 2 - roofHeight);
-            ctx.lineTo(-width, height - roofHeight);
-            ctx.closePath();
-            ctx.fill();
-            
-            // 屋顶边缘
-            ctx.strokeStyle = '#3e2723';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // 屋顶细节：屋脊
-            ctx.strokeStyle = '#4e342e';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(0, -roofHeight);
-            ctx.lineTo(0, height * 2 - roofHeight);
-            ctx.stroke();
-            
-            // 屋顶烟囱
-            ctx.fillStyle = '#795548';
-            ctx.fillRect(-width/3, -roofHeight - 15, 10, 20);
-            
-            ctx.restore();
-        }
+   // 绘制建筑屋顶（支持半透明，完全修复偏移问题）
+drawBuildingRoofs(ctx, cameraX, cameraY) {
+    for (const building of this.buildings) {
+        const alpha = building.entered ? 0.3 : 1; // 进入后屋顶更透明
+        
+        // 获取建筑四个角的笛卡尔坐标
+        const x1 = building.startTileX;
+        const y1 = building.startTileY;
+        const x2 = building.endTileX;
+        const y2 = building.startTileY;
+        const x3 = building.endTileX;
+        const y3 = building.endTileY;
+        const x4 = building.startTileX;
+        const y4 = building.endTileY;
+        
+        // 转换为等轴测屏幕坐标
+        const iso1 = cartesianToIsometric(x1, y1);
+        const iso2 = cartesianToIsometric(x2, y2);
+        const iso3 = cartesianToIsometric(x3, y3);
+        const iso4 = cartesianToIsometric(x4, y4);
+        
+        // 计算相对于相机的屏幕坐标
+        const screenX1 = iso1.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+        const screenY1 = iso1.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+        const screenX2 = iso2.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+        const screenY2 = iso2.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+        const screenX3 = iso3.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+        const screenY3 = iso3.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+        const screenX4 = iso4.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+        const screenY4 = iso4.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+        
+        // 屋顶高度
+        const roofHeight = 60;
+        
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        
+        // 绘制屋顶主体（精确覆盖建筑四个角）
+        ctx.fillStyle = '#5d4037';
+        ctx.beginPath();
+        ctx.moveTo((screenX1 + screenX2) / 2, screenY1 - roofHeight); // 屋脊顶部
+        ctx.lineTo(screenX2, screenY2 - roofHeight / 2); // 右上角
+        ctx.lineTo((screenX2 + screenX3) / 2, screenY3 - roofHeight); // 屋脊底部
+        ctx.lineTo(screenX4, screenY4 - roofHeight / 2); // 左下角
+        ctx.closePath();
+        ctx.fill();
+        
+        // 屋顶边缘
+        ctx.strokeStyle = '#3e2723';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // 屋脊（精确沿着建筑中线）
+        ctx.strokeStyle = '#4e342e';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo((screenX1 + screenX2) / 2, screenY1 - roofHeight);
+        ctx.lineTo((screenX2 + screenX3) / 2, screenY3 - roofHeight);
+        ctx.stroke();
+        
+        // 屋顶烟囱（放在左上角位置）
+        ctx.fillStyle = '#795548';
+        const chimneyX = (screenX1 + screenX2) / 2 + (screenX2 - screenX1) / 4;
+        const chimneyY = screenY1 - roofHeight - 15;
+        ctx.fillRect(chimneyX - 5, chimneyY, 10, 20);
+        
+        ctx.restore();
     }
+}
     
     // 绘制撤离点
     drawExtractionPoints(ctx, cameraX, cameraY) {
