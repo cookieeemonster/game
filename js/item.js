@@ -1,11 +1,10 @@
 class Item {
     constructor(map) {
         this.map = map;
-        this.type = 'health'; // 只保留医疗包
-        this.width = 16;
-        this.height = 16;
+        this.type = 'health';
+        this.width = 24;
+        this.height = 24;
         
-        // 随机生成物品位置
         do {
             this.x = randomInt(this.map.tileSize * 2, this.map.width - this.map.tileSize * 2);
             this.y = randomInt(this.map.tileSize * 2, this.map.height - this.map.tileSize * 2);
@@ -21,7 +20,6 @@ class Item {
         };
     }
     
-    // 玩家拾取物品
     pickup(player) {
         if (this.type === 'health') {
             player.health = Math.min(player.health + 25, CONFIG.PLAYER_MAX_HEALTH);
@@ -29,12 +27,24 @@ class Item {
     }
     
     draw(ctx, cameraX, cameraY) {
-        const screenX = this.x - cameraX;
-        const screenY = this.y - cameraY;
+        const tileX = this.x / this.map.tileSize;
+        const tileY = this.y / this.map.tileSize;
+        const iso = cartesianToIsometric(tileX, tileY);
+        const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+        const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
         
-        // 绘制医疗包（十字形状）
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        
+        // 医疗包底座
         ctx.fillStyle = '#4caf50';
-        ctx.fillRect(screenX - 8, screenY - 2, 16, 4);
-        ctx.fillRect(screenX - 2, screenY - 8, 4, 16);
+        ctx.fillRect(-10, -5, 20, 10);
+        
+        // 十字
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(-2, -8, 4, 16);
+        ctx.fillRect(-8, -2, 16, 4);
+        
+        ctx.restore();
     }
 }
