@@ -21,10 +21,9 @@ class Game {
             this.enemies.push(new Enemy(this.map, this.player));
         }
         
-        // 生成物品
+        // 生成物品（只生成医疗包）
         for (let i = 0; i < CONFIG.ITEM_SPAWN_COUNT; i++) {
-            const type = Math.random() < 0.5 ? 'health' : 'ammo';
-            this.items.push(new Item(this.map, type));
+            this.items.push(new Item(this.map));
         }
     }
     
@@ -64,12 +63,29 @@ class Game {
         });
     }
     
+    // 新增：检测玩家近战攻击是否命中敌人
+    checkPlayerAttack() {
+        if (!this.player.weapon.isAttacking) return;
+        
+        this.enemies.forEach(enemy => {
+            if (this.player.weapon.checkHit(this.player.x, this.player.y, enemy)) {
+                const isDead = enemy.takeDamage(this.player.weapon.damage);
+                if (isDead) {
+                    // 敌人死亡时可以添加掉落物逻辑
+                }
+            }
+        });
+    }
+    
     // 更新游戏状态
     update() {
         if (this.state !== GAME_STATE.PLAYING) return;
         
         this.player.update();
         this.enemies.forEach(enemy => enemy.update());
+        
+        // 检测玩家攻击命中
+        this.checkPlayerAttack();
         
         // 移除死亡的敌人
         this.enemies = this.enemies.filter(enemy => enemy.health > 0);
