@@ -1,7 +1,7 @@
 class Item {
-    constructor(map, type) {
+    constructor(map) {
         this.map = map;
-        this.type = type; // 'health' 或 'ammo'
+        this.type = 'health'; // 只保留医疗包
         this.width = 16;
         this.height = 16;
         
@@ -25,8 +25,6 @@ class Item {
     pickup(player) {
         if (this.type === 'health') {
             player.health = Math.min(player.health + 25, CONFIG.PLAYER_MAX_HEALTH);
-        } else if (this.type === 'ammo') {
-            player.ammo += 15;
         }
     }
     
@@ -34,13 +32,9 @@ class Item {
         const screenX = this.x - cameraX;
         const screenY = this.y - cameraY;
         
-        // 根据类型绘制不同颜色的物品
-        if (this.type === 'health') {
-            ctx.fillStyle = '#4caf50'; // 绿色医疗包
-        } else if (this.type === 'ammo') {
-            ctx.fillStyle = '#ff9800'; // 橙色弹药
-        }
-        
-        ctx.fillRect(screenX - this.width / 2, screenY - this.height / 2, this.width, this.height);
+        // 绘制医疗包（十字形状）
+        ctx.fillStyle = '#4caf50';
+        ctx.fillRect(screenX - 8, screenY - 2, 16, 4);
+        ctx.fillRect(screenX - 2, screenY - 8, 4, 16);
     }
 }
