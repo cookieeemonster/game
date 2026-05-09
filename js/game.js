@@ -26,7 +26,6 @@ class Game {
     
     // 更新相机（等轴测相机）
     updateCamera() {
-        // 转换玩家位置为等轴测坐标
         const tileX = this.player.x / this.map.tileSize;
         const tileY = this.player.y / this.map.tileSize;
         const iso = cartesianToIsometric(tileX, tileY);
@@ -85,7 +84,8 @@ class Game {
         this.checkItemPickup();
         this.checkExtraction();
         
-        this.map.updateExploredArea(this.player.x, this.player.y);
+        // 新增：更新玩家是否在建筑内
+        this.map.updatePlayerInBuilding(this.player.x, this.player.y);
         
         if (this.player.health <= 0) {
             this.state = GAME_STATE.LOSE;
@@ -112,7 +112,7 @@ class Game {
         // 4. 绘制玩家
         this.player.draw(this.ctx, this.cameraX, this.cameraY);
         
-        // 5. 绘制立体物体（树、石头、墙）
+        // 5. 绘制立体物体（树、石头、建筑外墙和门）
         this.map.drawObjects(this.ctx, this.cameraX, this.cameraY);
         
         // 6. 绘制撤离点
