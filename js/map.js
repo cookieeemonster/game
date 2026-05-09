@@ -319,46 +319,56 @@ class Map {
     // 【修复2：墙壁无黑色遮挡】
     // ==============================================
     drawFullCubeWall(ctx, x, y, alpha = 1) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.globalAlpha = alpha;
-        
-        const wallHeight = 42;
-        const W = this.tileSize / 2;
-        const H = this.tileHeight / 2;
-        
-        // 右侧面
-        ctx.fillStyle = '#8d6e63';
-        ctx.beginPath();
-        ctx.moveTo(W, 0);
-        ctx.lineTo(W, -wallHeight);
-        ctx.lineTo(0, -wallHeight - H);
-        ctx.lineTo(0, -H);
-        ctx.closePath();
-        ctx.fill();
-        
-        // 左侧面
-        ctx.fillStyle = '#6d4c41';
-        ctx.beginPath();
-        ctx.moveTo(-W, 0);
-        ctx.lineTo(-W, -wallHeight);
-        ctx.lineTo(0, -wallHeight - H);
-        ctx.lineTo(0, -H);
-        ctx.closePath();
-        ctx.fill();
-        
-        // 顶面
-        ctx.fillStyle = '#a1887f';
-        ctx.beginPath();
-        ctx.moveTo(0, -wallHeight - H);
-        ctx.lineTo(W, -wallHeight);
-        ctx.lineTo(0, -wallHeight + H);
-        ctx.lineTo(-W, -wallHeight);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.restore();
-    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalAlpha = alpha;
+    
+    const wallHeight = 42;
+    const W = this.tileSize / 2;
+    const H = this.tileHeight / 2;
+    
+    // 1. 先绘制后面（被挡住的面，防止底部漏黑）
+    ctx.fillStyle = '#5d4037';
+    ctx.beginPath();
+    ctx.moveTo(-W, 0);
+    ctx.lineTo(W, 0);
+    ctx.lineTo(W, -wallHeight);
+    ctx.lineTo(-W, -wallHeight);
+    ctx.closePath();
+    ctx.fill();
+    
+    // 2. 绘制右前侧面（亮面）
+    ctx.fillStyle = '#8d6e63';
+    ctx.beginPath();
+    ctx.moveTo(W, 0);
+    ctx.lineTo(W, -wallHeight);
+    ctx.lineTo(0, -wallHeight - H);
+    ctx.lineTo(0, -H);
+    ctx.closePath();
+    ctx.fill();
+    
+    // 3. 绘制左前侧面（暗面）
+    ctx.fillStyle = '#6d4c41';
+    ctx.beginPath();
+    ctx.moveTo(-W, 0);
+    ctx.lineTo(-W, -wallHeight);
+    ctx.lineTo(0, -wallHeight - H);
+    ctx.lineTo(0, -H);
+    ctx.closePath();
+    ctx.fill();
+    
+    // 4. 绘制顶面
+    ctx.fillStyle = '#a1887f';
+    ctx.beginPath();
+    ctx.moveTo(0, -wallHeight - H);
+    ctx.lineTo(W, -wallHeight);
+    ctx.lineTo(0, -wallHeight + H);
+    ctx.lineTo(-W, -wallHeight);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+}
     
     drawDoor(ctx, x, y, alpha = 1) {
         ctx.save();
