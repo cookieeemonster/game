@@ -1,16 +1,23 @@
 class Player {
     constructor(map) {
         this.map = map;
-        this.width = 24;
-        this.height = 32; // 像素小人更高一些
+        this.width = 32;
+        this.height = 32;
         this.health = CONFIG.PLAYER_MAX_HEALTH;
         this.speed = CONFIG.PLAYER_SPEED;
         
         // 武器系统
         this.weapon = new Sword();
-        this.facingDirection = 0; // 角色朝向（弧度）
+        this.direction = DIRECTION.DOWN; // 初始朝向下方
+        this.facingAngle = Math.PI / 2; // 初始角度向下
         
-        // 随机生成玩家初始位置（不在墙上）
+        // 动画系统
+        this.animationFrame = 0;
+        this.animationSpeed = 0.15;
+        this.isMoving = false;
+        this.isAttacking = false;
+        
+        // 随机生成初始位置
         do {
             this.x = randomInt(this.map.tileSize * 2, this.map.width - this.map.tileSize * 2);
             this.y = randomInt(this.map.tileSize * 2, this.map.height - this.map.tileSize * 2);
@@ -75,9 +82,11 @@ class Player {
             dy *= factor;
         }
         
-        // 更新角色朝向
-        if (dx !== 0 || dy !== 0) {
-            this.facingDirection = Math.atan2(dy, dx);
+        // 更新移动状态和朝向
+        this.isMoving = dx !== 0 || dy !== 0;
+        if (this.isMoving) {
+            this.facingAngle = Math.atan2(dy, dx);
+            this.direction = angleToDirection(this.facingAngle);
         }
         
         // 尝试移动X轴
@@ -101,12 +110,27 @@ class Player {
         this.y = clamp(this.y, this.height / 2, this.map.height - this.height / 2);
         
         // 处理攻击
-        if (this.keys.space) {
-            this.weapon.startAttack(this.facingDirection);
+        if (this.keys.space && !this.isAttacking) {
+            this.isAttacking = true;
+            this.weapon.startAttack(this.facingAngle);
+            this.animationFrame = 0;
         }
         
         // 更新武器状态
         this.weapon.update();
+        
+        // 更新动画
+        if (this.isMoving || this.isAttacking) {
+            this.animationFrame += this.animationSpeed;
+            if (this.animationFrame >= 4) {
+                this.animationFrame = 0;
+                if (this.isAttacking) {
+                    this.isAttacking = false;
+                }
+            }
+        } else {
+            this.animationFrame = 0;
+        }
     }
     
     // 玩家受伤
@@ -114,53 +138,100 @@ class Player {
         this.health -= amount;
         if (this.health <= 0) {
             this.health = 0;
-            return true; // 玩家死亡
+            return true;
         }
         return false;
     }
     
-    // 绘制像素风格玩家
+    // 绘制等轴测角色
     draw(ctx, cameraX, cameraY) {
-        const screenX = this.x - cameraX;
-        const screenY = this.y - cameraY;
+        // 转换为等轴测坐标
+        const tileX = this.x / this.map.tileSize;
+        const tileY = this.y / this.map.tileSize;
+        const iso = cartesianToIsometric(tileX, tileY);
+        const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
+        const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
         
         ctx.save();
         ctx.translate(screenX, screenY);
         
-        // 绘制身体（蓝色上衣）
-        ctx.fillStyle = '#2196f3';
-        ctx.fillRect(-8, -8, 16, 16);
+        // 根据方向调整角色绘制
+        const frame = Math.floor(this.animationFrame);
         
-        // 绘制头部（肤色）
-        ctx.fillStyle = '#ffcc99';
-        ctx.fillRect(-6, -16, 12, 10);
+        // 绘制身体
+        this.drawBody(ctx, frame);
         
-        // 绘制头发（棕色）
-        ctx.fillStyle = '#795548';
-        ctx.fillRect(-6, -18, 12, 4);
+        // 绘制头部
+        this.drawHead(ctx);
         
-        // 绘制眼睛（黑色）
-        ctx.fillStyle = '#000';
-        ctx.fillRect(-4, -12, 2, 2);
-        ctx.fillRect(2, -12, 2, 2);
-        
-        // 绘制腿（深蓝色裤子）
-        ctx.fillStyle = '#1565c0';
-        ctx.fillRect(-6, 8, 5, 8);
-        ctx.fillRect(1, 8, 5, 8);
-        
-        // 绘制武器（在攻击时会被武器类覆盖）
-        if (!this.weapon.isAttacking) {
-            ctx.rotate(this.facingDirection);
-            ctx.fillStyle = '#9e9e9e';
-            ctx.fillRect(10, -1, 20, 2);
-            ctx.fillStyle = '#795548';
-            ctx.fillRect(8, -2, 4, 4);
+        // 绘制武器
+        if (this.weapon.isAttacking) {
+            this.weapon.draw(ctx, 0, 0, 0, 0); // 武器自己处理坐标
+        } else {
+            this.drawWeapon(ctx);
         }
         
         ctx.restore();
+    }
+    
+    // 绘制角色身体
+    drawBody(ctx, frame) {
+        // 腿部动画
+        const legOffset = Math.sin(frame * Math.PI / 2) * 3;
         
-        // 绘制武器攻击效果
-        this.weapon.draw(ctx, this.x, this.y, cameraX, cameraY);
+        // 左腿
+        ctx.fillStyle = '#1565c0';
+        ctx.fillRect(-6, 0 + legOffset, 5, 12);
+        
+        // 右腿
+        ctx.fillStyle = '#0d47a1';
+        ctx.fillRect(1, 0 - legOffset, 5, 12);
+        
+        // 身体
+        ctx.fillStyle = '#2196f3';
+        ctx.fillRect(-8, -16, 16, 16);
+        
+        // 手臂动画
+        const armOffset = Math.sin(frame * Math.PI / 2) * 2;
+        
+        // 左臂
+        ctx.fillStyle = '#1976d2';
+        ctx.fillRect(-12, -14 + armOffset, 4, 10);
+        
+        // 右臂
+        ctx.fillStyle = '#1976d2';
+        ctx.fillRect(8, -14 - armOffset, 4, 10);
+    }
+    
+    // 绘制角色头部
+    drawHead(ctx) {
+        // 头部
+        ctx.fillStyle = '#ffcc99';
+        ctx.fillRect(-6, -32, 12, 16);
+        
+        // 头发
+        ctx.fillStyle = '#795548';
+        ctx.fillRect(-6, -34, 12, 6);
+        
+        // 眼睛
+        ctx.fillStyle = '#000';
+        ctx.fillRect(-4, -26, 2, 2);
+        ctx.fillRect(2, -26, 2, 2);
+    }
+    
+    // 绘制武器
+    drawWeapon(ctx) {
+        ctx.save();
+        ctx.rotate(this.facingAngle);
+        
+        // 剑柄
+        ctx.fillStyle = '#795548';
+        ctx.fillRect(8, -2, 6, 4);
+        
+        // 剑身
+        ctx.fillStyle = '#9e9e9e';
+        ctx.fillRect(14, -1, 24, 2);
+        
+        ctx.restore();
     }
 }
