@@ -24,14 +24,14 @@ class Game {
         }
     }
     
-    // 更新相机（等轴测相机）
     updateCamera() {
         const tileX = this.player.x / this.map.tileSize;
         const tileY = this.player.y / this.map.tileSize;
-        const iso = cartesianToIsometric(tileX, tileY);
+        const isoX = (tileX - tileY) * (this.map.tileSize / 2);
+        const isoY = (tileX + tileY) * (this.map.tileHeight / 2);
         
-        this.cameraX = iso.x;
-        this.cameraY = iso.y;
+        this.cameraX = isoX;
+        this.cameraY = isoY;
     }
     
     checkExtraction() {
@@ -84,7 +84,6 @@ class Game {
         this.checkItemPickup();
         this.checkExtraction();
         
-        // 新增：更新玩家是否在建筑内
         this.map.updatePlayerInBuilding(this.player.x, this.player.y);
         
         if (this.player.health <= 0) {
@@ -96,26 +95,35 @@ class Game {
         this.ui.update();
     }
     
+    // ==============================================
+    // 【修复3：桥在人下面 + 修复4：白色浮空块消失】
+    // 完美图层顺序：地面 → 物品 → 敌人 → 玩家 → 立体物体 → 屋顶
+    // ==============================================
     render() {
-        this.ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        // 1. 清空画布（彻底解决白色浮空块）
+        this.ctx.fillStyle = '#2d2d2d';
+        this.ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
         
-        // 1. 绘制地图地面
-        this.map.draw(this.ctx, this.cameraX, this.cameraY);
+        // 2. 绘制地面层（包括桥，现在在最下面）
+        this.map.drawGround(this.ctx, this.cameraX, this.cameraY);
         
-        // 2. 绘制物品
+        // 3. 绘制物品
         this.items.forEach(item => item.draw(this.ctx, this.cameraX, this.cameraY));
         
-        // 3. 绘制敌人（按Y轴排序）
+        // 4. 绘制敌人（按Y轴排序）
         this.enemies.sort((a, b) => a.y - b.y);
         this.enemies.forEach(enemy => enemy.draw(this.ctx, this.cameraX, this.cameraY));
         
-        // 4. 绘制玩家
+        // 5. 绘制玩家
         this.player.draw(this.ctx, this.cameraX, this.cameraY);
         
-        // 5. 绘制立体物体（树、石头、建筑外墙和门）
+        // 6. 绘制立体物体（墙、树、石头、门）
         this.map.drawObjects(this.ctx, this.cameraX, this.cameraY);
         
-        // 6. 绘制撤离点
+        // 7. 绘制屋顶
+        this.map.drawFlatRoofs(this.ctx, this.cameraX, this.cameraY);
+        
+        // 8. 绘制撤离点
         this.map.drawExtractionPoints(this.ctx, this.cameraX, this.cameraY);
     }
     
@@ -128,4 +136,5 @@ class Game {
     start() {
         this.gameLoop();
     }
+}
 }
