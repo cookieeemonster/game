@@ -64,7 +64,7 @@ class Map {
             }
         }
         
-        // 生成树林（跳过水和桥）
+        // 生成树林（跳过水、桥）
         for (let y = 2; y < rows - 2; y++) {
             for (let x = 2; x < cols - 2; x++) {
                 if (this.tiles[y][x] === 0 && Math.random() < 0.06) {
@@ -83,7 +83,7 @@ class Map {
         }
     }
     
-    // 生成预制建筑（保持不变）
+    // 生成预制建筑
     generateBuildings() {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
@@ -110,7 +110,8 @@ class Map {
                 let canPlace = true;
                 for (let y = 0; y < templateHeight; y++) {
                     for (let x = 0; x < templateWidth; x++) {
-                        if (this.tiles[startY + y][startX + x] === 4 || this.tiles[startY + y][startX + x] === 7) {
+                        if (this.tiles[startY + y][startX + x] === 4 ||
+                            this.tiles[startY + y][startX + x] === 7) {
                             canPlace = false;
                             break;
                         }
@@ -141,18 +142,60 @@ class Map {
     }
     
     // 小木屋模板（6x6）
-    createSmallHouseTemplate() { ... }   // 与原来完全相同，省略
+    createSmallHouseTemplate() {
+        return [
+            [1,1,1,1,1,1],
+            [1,5,5,5,5,1],
+            [1,5,5,5,5,1],
+            [1,5,5,5,5,1],
+            [1,5,5,5,5,1],
+            [1,1,1,6,1,1]
+        ];
+    }
     
     // 大仓库模板（8x8）
-    createWarehouseTemplate() { ... }    // 省略
+    createWarehouseTemplate() {
+        return [
+            [1,1,1,1,1,1,1,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,1,1,5,5,1],
+            [1,5,5,1,1,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,1,1,6,6,1,1,1]
+        ];
+    }
     
     // 两层楼房模板（8x10）
-    createTwoStoryHouseTemplate() { ... } // 省略
+    createTwoStoryHouseTemplate() {
+        return [
+            [1,1,1,1,1,1,1,1],
+            [1,5,5,1,1,5,5,1],
+            [1,5,5,1,1,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,1,1,5,5,1,1,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,5,5,5,5,1],
+            [1,5,5,1,1,5,5,1],
+            [1,1,1,6,6,1,1,1]
+        ];
+    }
     
     // 放置建筑
-    placeBuilding(template, startX, startY) { ... } // 省略
+    placeBuilding(template, startX, startY) {
+        const templateHeight = template.length;
+        const templateWidth = template[0].length;
+        
+        for (let y = 0; y < templateHeight; y++) {
+            for (let x = 0; x < templateWidth; x++) {
+                this.tiles[startY + y][startX + x] = template[y][x];
+            }
+        }
+    }
     
-    // 构建碰撞体列表（桥7不算障碍，仅墙、树、石头、水阻挡）
+    // 构建碰撞体列表（桥7不算障碍，墙、树、石头、水阻挡）
     buildCollisionList() {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
@@ -174,18 +217,55 @@ class Map {
         }
     }
     
-    // 生成撤离点（跳过水和建筑区域）
-    generateExtractionPoints() { ... } // 省略，保持不变
+    // 生成撤离点
+    generateExtractionPoints() {
+        const cols = Math.floor(this.width / this.tileSize);
+        const rows = Math.floor(this.height / this.tileSize);
+        
+        for (let i = 0; i < CONFIG.EXTRACTION_POINT_COUNT; i++) {
+            let x, y;
+            let valid = false;
+            let attempts = 0;
+            
+            while (!valid && attempts < 100) {
+                const tileX = randomInt(5, cols - 5);
+                const tileY = randomInt(5, rows - 5);
+                
+                if (this.tiles[tileY][tileX] === 0) {
+                    x = tileX * this.tileSize;
+                    y = tileY * this.tileSize;
+                    valid = true;
+                }
+                
+                attempts++;
+            }
+            
+            if (valid) {
+                this.extractionPoints.push({
+                    x, y, 
+                    width: this.tileSize * 2, 
+                    height: this.tileSize * 2
+                });
+            }
+        }
+    }
     
     // 碰撞检测
-    isColliding(rect) { ... }
+    isColliding(rect) {
+        return this.walls.some(wall => rectCollision(rect, wall));
+    }
     
     // 检测玩家是否在建筑内
-    updatePlayerInBuilding(playerX, playerY) { ... }
+    updatePlayerInBuilding(playerX, playerY) {
+        for (const building of this.buildings) {
+            building.entered = (
+                playerX > building.x && playerX < building.x + building.width &&
+                playerY > building.y && playerY < building.y + building.height
+            );
+        }
+    }
     
-    // ============ 绘制部分 ============
-    
-    // 绘制等轴测地图地面（增加桥 tile 的处理）
+    // 绘制等轴测地图地面
     draw(ctx, cameraX, cameraY) {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
@@ -194,6 +274,7 @@ class Map {
             for (let x = 0; x < cols; x++) {
                 const isoX = (x - y) * (this.tileSize / 2);
                 const isoY = (x + y) * (this.tileHeight / 2);
+                
                 const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
                 const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
                 
@@ -280,7 +361,7 @@ class Map {
         ctx.restore();
     }
     
-    // 绘制所有立体物体（增加桥的绘制）
+    // 绘制所有立体物体（树、石头、建筑等）
     drawObjects(ctx, cameraX, cameraY) {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
@@ -289,6 +370,7 @@ class Map {
             for (let x = 0; x < cols; x++) {
                 const isoX = (x - y) * (this.tileSize / 2);
                 const isoY = (x + y) * (this.tileHeight / 2);
+                
                 const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
                 const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
                 
@@ -321,7 +403,7 @@ class Map {
                     case 6: // 门
                         this.drawDoor(ctx, screenX, screenY, buildingAlpha);
                         break;
-                    case 7: // 桥的立体结构
+                    case 7: // 桥立体结构
                         this.drawBridge(ctx, screenX, screenY);
                         break;
                 }
@@ -332,7 +414,7 @@ class Map {
         this.drawBuildingRoofs(ctx, cameraX, cameraY);
     }
     
-    // 绘制墙壁（增加轮廓线让三个面更清晰）
+    // 绘制立体墙（增加轮廓线让三个面更清晰）
     drawWall(ctx, x, y, alpha = 1) {
         ctx.save();
         ctx.translate(x, y);
@@ -380,21 +462,98 @@ class Map {
         ctx.restore();
     }
     
-    // 绘制门（同上，不改）
-    drawDoor(ctx, x, y, alpha = 1) { ... } // 省略
+    // 绘制门（与原版基本一致）
+    drawDoor(ctx, x, y, alpha = 1) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.globalAlpha = alpha;
+        
+        const doorHeight = 50;
+        
+        // 门框
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(-12, -doorHeight, 24, doorHeight);
+        
+        // 门板
+        ctx.fillStyle = '#795548';
+        ctx.fillRect(-10, -doorHeight + 2, 20, doorHeight - 2);
+        
+        // 门把手
+        ctx.fillStyle = '#ffc107';
+        ctx.beginPath();
+        ctx.arc(6, -doorHeight / 2, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
     
-    // 绘制树（同上）
-    drawTree(ctx, x, y) { ... } // 省略
+    // 绘制立体树
+    drawTree(ctx, x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // 树干
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(-4, -30, 8, 30);
+        
+        // 树冠
+        ctx.fillStyle = '#2e7d32';
+        ctx.beginPath();
+        ctx.arc(0, -50, 20, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#388e3c';
+        ctx.beginPath();
+        ctx.arc(-8, -40, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(8, -45, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#43a047';
+        ctx.beginPath();
+        ctx.arc(0, -35, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
     
-    // 绘制石头（同上）
-    drawRock(ctx, x, y) { ... } // 省略
+    // 绘制立体石头（底部与地面齐平）
+    drawRock(ctx, x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // 石头主体
+        ctx.fillStyle = '#9e9e9e';
+        ctx.beginPath();
+        ctx.moveTo(-12, 0);
+        ctx.lineTo(-8, -15);
+        ctx.lineTo(5, -20);
+        ctx.lineTo(15, -10);
+        ctx.lineTo(12, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 石头阴影
+        ctx.fillStyle = '#757575';
+        ctx.beginPath();
+        ctx.moveTo(-12, 0);
+        ctx.lineTo(-8, -15);
+        ctx.lineTo(0, -10);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+    }
     
-    // 绘制桥的立体部分（桥面厚度 + 栏杆）
+    // 绘制桥的立体结构（桥面厚度 + 栏杆）
     drawBridge(ctx, x, y) {
         ctx.save();
         ctx.translate(x, y);
         
-        const bridgeThickness = 8;   // 桥面厚度
+        const bridgeThickness = 8;
         
         // 桥面侧面（左侧下方可见）
         ctx.fillStyle = '#5d4037';
@@ -416,11 +575,9 @@ class Map {
         ctx.closePath();
         ctx.fill();
         
-        // 栏杆（四个角各一根，顶部中心一根）
         const railHeight = 18;
-        const railColor = '#4e342e';
-        ctx.fillStyle = railColor;
         
+        // 栏杆柱子（三个点：左角、右角、顶部中心）
         const corners = [
             { dx: -this.tileSize / 2, dy: 0 },
             { dx: this.tileSize / 2, dy: 0 },
@@ -428,13 +585,11 @@ class Map {
         ];
         
         corners.forEach(c => {
-            const baseX = c.dx;
-            const baseY = c.dy;
-            // 柱子（从桥面顶向下到栏杆顶）
-            ctx.fillRect(baseX - 2, baseY - bridgeThickness - railHeight, 4, railHeight);
+            ctx.fillStyle = '#4e342e';
+            ctx.fillRect(c.dx - 2, c.dy - bridgeThickness - railHeight, 4, railHeight);
         });
         
-        // 横向栏杆绳索（连接三点）
+        // 横向栏杆
         ctx.strokeStyle = '#8d6e63';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -449,7 +604,7 @@ class Map {
         ctx.restore();
     }
     
-    // 绘制平顶建筑屋顶（替代原来尖顶）
+    // 绘制建筑平顶（替代原来的尖顶）
     drawBuildingRoofs(ctx, cameraX, cameraY) {
         for (const building of this.buildings) {
             const alpha = building.entered ? 0.3 : 1;
@@ -477,18 +632,18 @@ class Map {
             const p3 = getScreenPos(x3, y3);
             const p4 = getScreenPos(x4, y4);
             
-            const roofHeightOffset = 40; // 墙壁高度，与 drawWall 一致
+            const roofHeightOffset = 40; // 与墙壁高度一致
             
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            
-            // 四个角的屋顶坐标（平顶，取墙壁顶部）
+            // 四个平屋顶角
             const r1 = { x: p1.x, y: p1.y - roofHeightOffset };
             const r2 = { x: p2.x, y: p2.y - roofHeightOffset };
             const r3 = { x: p3.x, y: p3.y - roofHeightOffset };
             const r4 = { x: p4.x, y: p4.y - roofHeightOffset };
             
-            // 绘制平顶主体
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            
+            // 平顶主体
             ctx.fillStyle = '#5d4037';
             ctx.beginPath();
             ctx.moveTo(r1.x, r1.y);
@@ -498,15 +653,14 @@ class Map {
             ctx.closePath();
             ctx.fill();
             
-            // 边框
             ctx.strokeStyle = '#3e2723';
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // 烟囱（可选，放在屋顶一角）
+            // 烟囱
             ctx.fillStyle = '#795548';
             const chimneyX = r1.x + (r2.x - r1.x) * 0.3;
-            const chimneyY = r1.y - 15;   // 放在屋顶上方
+            const chimneyY = r1.y - 15;
             ctx.fillRect(chimneyX - 5, chimneyY, 10, 20);
             ctx.strokeStyle = '#4e342e';
             ctx.lineWidth = 1;
@@ -516,6 +670,32 @@ class Map {
         }
     }
     
-    // 绘制撤离点（保持不变）
-    drawExtractionPoints(ctx, cameraX, cameraY) { ... } // 省略
+    // 绘制撤离点
+    drawExtractionPoints(ctx, cameraX, cameraY) {
+        ctx.fillStyle = `rgba(76, 175, 80, ${0.5 + Math.sin(Date.now() / 500) * 0.3})`;
+        
+        this.extractionPoints.forEach(point => {
+            const tileX = point.x / this.tileSize;
+            const tileY = point.y / this.tileSize;
+            
+            const isoX = (tileX - tileY) * (this.tileSize / 2);
+            const isoY = (tileX + tileY) * (this.tileHeight / 2);
+            
+            const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
+            const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(screenX, screenY - this.tileHeight);
+            ctx.lineTo(screenX + this.tileSize, screenY);
+            ctx.lineTo(screenX, screenY + this.tileHeight);
+            ctx.lineTo(screenX - this.tileSize, screenY);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('撤离点', screenX, screenY + 5);
+        });
+    }
 }
