@@ -2,8 +2,8 @@ class Map {
     constructor() {
         this.width = CONFIG.MAP_WIDTH;
         this.height = CONFIG.MAP_HEIGHT;
-        this.tileSize = CONFIG.TILE_SIZE;       // 64
-        this.tileHeight = CONFIG.TILE_HEIGHT;   // 32
+        this.tileSize = CONFIG.TILE_SIZE; // 64
+        this.tileHeight = CONFIG.TILE_HEIGHT; // 32
         
         // 地图数据：0=草地, 1=墙, 2=树, 3=石头, 4=水, 5=建筑地板, 6=门, 7=桥
         this.tiles = [];
@@ -52,19 +52,18 @@ class Map {
             }
         }
         
-        // 生成桥梁（使用新的桥 tile 类型）
+        // 生成真实桥梁
         for (let i = 0; i < 3; i++) {
             const bridgeX = randomInt(Math.floor(cols * 0.2), Math.floor(cols * 0.8));
-            const centerY = riverY + Math.floor(Math.sin(bridgeX * 0.2) * 2);
             for (let dy = -1; dy <= 1; dy++) {
-                const y = centerY + dy;
-                if (y > 1 && y < rows - 2 && this.tiles[y][bridgeX] === 4) {
-                    this.tiles[y][bridgeX] = 7;   // 桥
+                const y = riverY + Math.floor(Math.sin(bridgeX * 0.2) * 2) + dy;
+                if (y > 1 && y < rows - 2) {
+                    this.tiles[y][bridgeX] = 7; // 7=桥
                 }
             }
         }
         
-        // 生成树林（跳过水、桥）
+        // 生成树林
         for (let y = 2; y < rows - 2; y++) {
             for (let x = 2; x < cols - 2; x++) {
                 if (this.tiles[y][x] === 0 && Math.random() < 0.06) {
@@ -73,7 +72,7 @@ class Map {
             }
         }
         
-        // 生成石头（跳过水、桥）
+        // 生成石头
         for (let y = 2; y < rows - 2; y++) {
             for (let x = 2; x < cols - 2; x++) {
                 if (this.tiles[y][x] === 0 && Math.random() < 0.02) {
@@ -110,8 +109,7 @@ class Map {
                 let canPlace = true;
                 for (let y = 0; y < templateHeight; y++) {
                     for (let x = 0; x < templateWidth; x++) {
-                        if (this.tiles[startY + y][startX + x] === 4 ||
-                            this.tiles[startY + y][startX + x] === 7) {
+                        if (this.tiles[startY + y][startX + x] === 4) {
                             canPlace = false;
                             break;
                         }
@@ -195,7 +193,7 @@ class Map {
         }
     }
     
-    // 构建碰撞体列表（桥7不算障碍，墙、树、石头、水阻挡）
+    // 构建碰撞体列表
     buildCollisionList() {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
@@ -205,6 +203,7 @@ class Map {
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
                 const tile = this.tiles[y][x];
+                // 墙、树、石头、水都是碰撞体，门和桥不是
                 if (tile === 1 || tile === 2 || tile === 3 || tile === 4) {
                     this.walls.push({
                         x: x * this.tileSize,
@@ -265,41 +264,49 @@ class Map {
         }
     }
     
+    // 统一坐标转换函数（所有物体都用这个）
+    getScreenXY(tileX, tileY, cameraX, cameraY) {
+        const isoX = (tileX - tileY) * (this.tileSize / 2);
+        const isoY = (tileX + tileY) * (this.tileHeight / 2);
+        return {
+            x: isoX - cameraX + CONFIG.CANVAS_WIDTH / 2,
+            y: isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2
+        };
+    }
+    
     // 绘制等轴测地图地面
     draw(ctx, cameraX, cameraY) {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
         
+        // 按Y轴顺序绘制地面，确保正确的层叠
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
-                const isoX = (x - y) * (this.tileSize / 2);
-                const isoY = (x + y) * (this.tileHeight / 2);
-                
-                const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
-                const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
+                const screen = this.getScreenXY(x, y, cameraX, cameraY);
                 
                 // 视口裁剪
-                if (screenX + this.tileSize < 0 || screenX - this.tileSize > CONFIG.CANVAS_WIDTH ||
-                    screenY + this.tileHeight < 0 || screenY - this.tileHeight > CONFIG.CANVAS_HEIGHT) {
+                if (screen.x + this.tileSize < 0 || screen.x - this.tileSize > CONFIG.CANVAS_WIDTH ||
+                    screen.y + this.tileHeight < 0 || screen.y - this.tileHeight > CONFIG.CANVAS_HEIGHT) {
                     continue;
                 }
                 
                 const tile = this.tiles[y][x];
-                this.drawTile(ctx, screenX, screenY, tile);
+                this.drawTile(ctx, screen.x, screen.y, tile);
             }
         }
     }
     
-    // 绘制单个等轴测瓦片地面
+    // 绘制单个等轴测瓦片（原点在底部中心）
     drawTile(ctx, x, y, tile) {
         ctx.save();
         ctx.translate(x, y);
         
+        // 绘制菱形地面（四个点相对于底部中心）
         ctx.beginPath();
-        ctx.moveTo(0, -this.tileHeight / 2);
-        ctx.lineTo(this.tileSize / 2, 0);
-        ctx.lineTo(0, this.tileHeight / 2);
-        ctx.lineTo(-this.tileSize / 2, 0);
+        ctx.moveTo(0, -this.tileHeight / 2); // 顶部
+        ctx.lineTo(this.tileSize / 2, 0); // 右部
+        ctx.lineTo(0, this.tileHeight / 2); // 底部
+        ctx.lineTo(-this.tileSize / 2, 0); // 左部
         ctx.closePath();
         
         switch (tile) {
@@ -340,207 +347,181 @@ class Map {
                 ctx.stroke();
                 break;
                 
-            case 7: // 桥面（木板质感）
-                ctx.fillStyle = '#8d6e63';
+            case 7: // 桥
+                ctx.fillStyle = '#8B4513';
                 ctx.fill();
-                ctx.strokeStyle = '#5d4037';
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#5D2906';
                 ctx.stroke();
-                // 木板纹路
-                ctx.strokeStyle = '#a1887f';
-                ctx.lineWidth = 1;
-                for (let i = -1; i <= 1; i++) {
-                    ctx.beginPath();
-                    ctx.moveTo(-this.tileSize / 4 + i * 8, -this.tileHeight / 4);
-                    ctx.lineTo(this.tileSize / 4 + i * 8, this.tileHeight / 4);
-                    ctx.stroke();
-                }
                 break;
         }
         
         ctx.restore();
     }
     
-    // 绘制所有立体物体（树、石头、建筑等）
+    // 绘制所有立体物体（树、石头、建筑）
     drawObjects(ctx, cameraX, cameraY) {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
         
+        // 严格按Y轴从下到上绘制，实现完美遮挡
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
-                const isoX = (x - y) * (this.tileSize / 2);
-                const isoY = (x + y) * (this.tileHeight / 2);
+                const screen = this.getScreenXY(x, y, cameraX, cameraY);
                 
-                const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
-                const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
-                
-                if (screenX + this.tileSize < 0 || screenX - this.tileSize > CONFIG.CANVAS_WIDTH ||
-                    screenY + this.tileHeight * 3 < 0 || screenY - this.tileHeight * 3 > CONFIG.CANVAS_HEIGHT) {
+                if (screen.x + this.tileSize < 0 || screen.x - this.tileSize > CONFIG.CANVAS_WIDTH ||
+                    screen.y + this.tileHeight * 3 < 0 || screen.y - this.tileHeight * 3 > CONFIG.CANVAS_HEIGHT) {
                     continue;
                 }
                 
                 const tile = this.tiles[y][x];
                 
+                // 检查是否在已进入的建筑内
                 let buildingAlpha = 1;
                 for (const building of this.buildings) {
                     if (x >= building.startTileX && x < building.endTileX &&
                         y >= building.startTileY && y < building.endTileY) {
-                        buildingAlpha = building.entered ? 0.5 : 1;
+                        buildingAlpha = building.entered ? 0.4 : 1;
                         break;
                     }
                 }
                 
+                // 绘制立体物体（所有物体原点都在底部中心，与地面接触）
                 switch (tile) {
-                    case 1: // 墙
-                        this.drawWall(ctx, screenX, screenY, buildingAlpha);
+                    case 1: // 墙（完整立方体）
+                        this.drawFullCubeWall(ctx, screen.x, screen.y, buildingAlpha);
                         break;
+                        
                     case 2: // 树
-                        this.drawTree(ctx, screenX, screenY);
+                        this.drawTree(ctx, screen.x, screen.y);
                         break;
-                    case 3: // 石头
-                        this.drawRock(ctx, screenX, screenY);
+                        
+                    case 3: // 石头（完全落地）
+                        this.drawRock(ctx, screen.x, screen.y);
                         break;
+                        
                     case 6: // 门
-                        this.drawDoor(ctx, screenX, screenY, buildingAlpha);
+                        this.drawDoor(ctx, screen.x, screen.y, buildingAlpha);
                         break;
-                    case 7: // 桥立体结构
-                        this.drawBridge(ctx, screenX, screenY);
+                        
+                    case 7: // 桥（真实木板桥）
+                        this.drawBridge(ctx, screen.x, screen.y);
                         break;
                 }
             }
         }
         
-        // 最后绘制屋顶（平顶）
-        this.drawBuildingRoofs(ctx, cameraX, cameraY);
+        // 最后绘制屋顶（在所有物体之上）
+        this.drawFlatRoofs(ctx, cameraX, cameraY);
     }
     
-    // 绘制立体墙（增加轮廓线让三个面更清晰）
-    drawWall(ctx, x, y, alpha = 1) {
+    // ==============================================
+    // 【修复1：完整6面立方体墙体】
+    // ==============================================
+    drawFullCubeWall(ctx, x, y, alpha = 1) {
         ctx.save();
         ctx.translate(x, y);
         ctx.globalAlpha = alpha;
         
-        const wallHeight = 40;
-        
-        // 左侧面
-        ctx.fillStyle = '#6d4c41';
-        ctx.beginPath();
-        ctx.moveTo(-this.tileSize / 2, 0);
-        ctx.lineTo(-this.tileSize / 2, -wallHeight);
-        ctx.lineTo(0, -wallHeight - this.tileHeight / 2);
-        ctx.lineTo(0, -this.tileHeight / 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#4e342e';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        const wallHeight = 42;
+        const W = this.tileSize / 2;
+        const H = this.tileHeight / 2;
         
         // 右侧面
         ctx.fillStyle = '#8d6e63';
         ctx.beginPath();
-        ctx.moveTo(this.tileSize / 2, 0);
-        ctx.lineTo(this.tileSize / 2, -wallHeight);
-        ctx.lineTo(0, -wallHeight - this.tileHeight / 2);
-        ctx.lineTo(0, -this.tileHeight / 2);
+        ctx.moveTo(W, 0);
+        ctx.lineTo(W, -wallHeight);
+        ctx.lineTo(0, -wallHeight - H);
+        ctx.lineTo(0, -H);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = '#5d4037';
-        ctx.stroke();
+        
+        // 左侧面
+        ctx.fillStyle = '#6d4c41';
+        ctx.beginPath();
+        ctx.moveTo(-W, 0);
+        ctx.lineTo(-W, -wallHeight);
+        ctx.lineTo(0, -wallHeight - H);
+        ctx.lineTo(0, -H);
+        ctx.closePath();
+        ctx.fill();
         
         // 顶面
         ctx.fillStyle = '#a1887f';
         ctx.beginPath();
-        ctx.moveTo(0, -wallHeight - this.tileHeight / 2);
-        ctx.lineTo(this.tileSize / 2, -wallHeight);
-        ctx.lineTo(0, -wallHeight + this.tileHeight / 2);
-        ctx.lineTo(-this.tileSize / 2, -wallHeight);
+        ctx.moveTo(0, -wallHeight - H);
+        ctx.lineTo(W, -wallHeight);
+        ctx.lineTo(0, -wallHeight + H);
+        ctx.lineTo(-W, -wallHeight);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = '#8d6e63';
-        ctx.stroke();
         
         ctx.restore();
     }
     
-    // 绘制门（与原版基本一致）
+    // 绘制门
     drawDoor(ctx, x, y, alpha = 1) {
         ctx.save();
         ctx.translate(x, y);
         ctx.globalAlpha = alpha;
         
-        const doorHeight = 50;
-        
-        // 门框
-        ctx.fillStyle = '#5d4037';
-        ctx.fillRect(-12, -doorHeight, 24, doorHeight);
+        const doorHeight = 48;
         
         // 门板
         ctx.fillStyle = '#795548';
-        ctx.fillRect(-10, -doorHeight + 2, 20, doorHeight - 2);
+        ctx.fillRect(-10, -doorHeight, 20, doorHeight);
         
         // 门把手
         ctx.fillStyle = '#ffc107';
         ctx.beginPath();
-        ctx.arc(6, -doorHeight / 2, 2, 0, Math.PI * 2);
+        ctx.arc(5, -doorHeight / 2, 2, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.restore();
     }
     
-    // 绘制立体树
+    // 绘制树
     drawTree(ctx, x, y) {
         ctx.save();
         ctx.translate(x, y);
         
-        // 树干
+        // 树干（从地面向上生长）
         ctx.fillStyle = '#5d4037';
-        ctx.fillRect(-4, -30, 8, 30);
+        ctx.fillRect(-4, -32, 8, 32);
         
         // 树冠
         ctx.fillStyle = '#2e7d32';
         ctx.beginPath();
-        ctx.arc(0, -50, 20, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#388e3c';
-        ctx.beginPath();
-        ctx.arc(-8, -40, 15, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.arc(8, -45, 15, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#43a047';
-        ctx.beginPath();
-        ctx.arc(0, -35, 12, 0, Math.PI * 2);
+        ctx.arc(0, -55, 22, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.restore();
     }
     
-    // 绘制立体石头（底部与地面齐平）
+    // ==============================================
+    // 【修复2：石头彻底落地，无浮空】
+    // ==============================================
     drawRock(ctx, x, y) {
         ctx.save();
         ctx.translate(x, y);
         
-        // 石头主体
+        // 石头主体（底部与地面齐平）
         ctx.fillStyle = '#9e9e9e';
         ctx.beginPath();
-        ctx.moveTo(-12, 0);
-        ctx.lineTo(-8, -15);
-        ctx.lineTo(5, -20);
-        ctx.lineTo(15, -10);
-        ctx.lineTo(12, 0);
+        ctx.moveTo(-14, 0); // 左下角（地面）
+        ctx.lineTo(-10, -18); // 左上角
+        ctx.lineTo(4, -24); // 顶部
+        ctx.lineTo(16, -14); // 右上角
+        ctx.lineTo(14, 0); // 右下角（地面）
         ctx.closePath();
         ctx.fill();
         
         // 石头阴影
         ctx.fillStyle = '#757575';
         ctx.beginPath();
-        ctx.moveTo(-12, 0);
-        ctx.lineTo(-8, -15);
-        ctx.lineTo(0, -10);
+        ctx.moveTo(-14, 0);
+        ctx.lineTo(-10, -18);
+        ctx.lineTo(0, -12);
         ctx.lineTo(0, 0);
         ctx.closePath();
         ctx.fill();
@@ -548,123 +529,75 @@ class Map {
         ctx.restore();
     }
     
-    // 绘制桥的立体结构（桥面厚度 + 栏杆）
+    // ==============================================
+    // 【修复3：真实木板桥】
+    // ==============================================
     drawBridge(ctx, x, y) {
         ctx.save();
         ctx.translate(x, y);
         
-        const bridgeThickness = 8;
+        const W = this.tileSize / 2;
+        const H = this.tileHeight / 2;
         
-        // 桥面侧面（左侧下方可见）
-        ctx.fillStyle = '#5d4037';
+        // 桥板
+        ctx.fillStyle = '#5D2906';
         ctx.beginPath();
-        ctx.moveTo(-this.tileSize / 2, 0);
-        ctx.lineTo(-this.tileSize / 2, -bridgeThickness);
-        ctx.lineTo(0, -bridgeThickness - this.tileHeight / 2);
-        ctx.lineTo(0, -this.tileHeight / 2);
+        ctx.moveTo(0, -H);
+        ctx.lineTo(W, 0);
+        ctx.lineTo(0, H);
+        ctx.lineTo(-W, 0);
         ctx.closePath();
         ctx.fill();
         
-        // 桥面侧面（右侧下方可见）
-        ctx.fillStyle = '#795548';
-        ctx.beginPath();
-        ctx.moveTo(this.tileSize / 2, 0);
-        ctx.lineTo(this.tileSize / 2, -bridgeThickness);
-        ctx.lineTo(0, -bridgeThickness - this.tileHeight / 2);
-        ctx.lineTo(0, -this.tileHeight / 2);
-        ctx.closePath();
-        ctx.fill();
-        
-        const railHeight = 18;
-        
-        // 栏杆柱子（三个点：左角、右角、顶部中心）
-        const corners = [
-            { dx: -this.tileSize / 2, dy: 0 },
-            { dx: this.tileSize / 2, dy: 0 },
-            { dx: 0, dy: -this.tileHeight / 2 },
-        ];
-        
-        corners.forEach(c => {
-            ctx.fillStyle = '#4e342e';
-            ctx.fillRect(c.dx - 2, c.dy - bridgeThickness - railHeight, 4, railHeight);
-        });
-        
-        // 横向栏杆
-        ctx.strokeStyle = '#8d6e63';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        corners.forEach((c, i) => {
-            const railY = c.dy - bridgeThickness - railHeight + 2;
-            if (i === 0) ctx.moveTo(c.dx, railY);
-            else ctx.lineTo(c.dx, railY);
-        });
-        ctx.closePath();
-        ctx.stroke();
+        // 木板纹理
+        ctx.strokeStyle = '#3a1a03';
+        ctx.lineWidth = 1;
+        for (let i = -8; i <= 8; i += 4) {
+            ctx.beginPath();
+            ctx.moveTo(-W + i, 0);
+            ctx.lineTo(W + i, 0);
+            ctx.stroke();
+        }
         
         ctx.restore();
     }
     
-    // 绘制建筑平顶（替代原来的尖顶）
-    drawBuildingRoofs(ctx, cameraX, cameraY) {
+    // ==============================================
+    // 【修复4：完美平顶屋顶，严丝合缝】
+    // ==============================================
+    drawFlatRoofs(ctx, cameraX, cameraY) {
         for (const building of this.buildings) {
-            const alpha = building.entered ? 0.3 : 1;
+            const alpha = building.entered ? 0.3 : 0.9;
             
+            // 获取建筑四个角的瓦片坐标
             const x1 = building.startTileX;
             const y1 = building.startTileY;
             const x2 = building.endTileX - 1;
-            const y2 = building.startTileY;
-            const x3 = building.endTileX - 1;
-            const y3 = building.endTileY - 1;
-            const x4 = building.startTileX;
-            const y4 = building.endTileY - 1;
+            const y2 = building.endTileY - 1;
             
-            const getScreenPos = (tx, ty) => {
-                const isoX = (tx - ty) * (this.tileSize / 2);
-                const isoY = (tx + ty) * (this.tileHeight / 2);
-                return {
-                    x: isoX - cameraX + CONFIG.CANVAS_WIDTH / 2,
-                    y: isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2
-                };
-            };
-            
-            const p1 = getScreenPos(x1, y1);
-            const p2 = getScreenPos(x2, y2);
-            const p3 = getScreenPos(x3, y3);
-            const p4 = getScreenPos(x4, y4);
-            
-            const roofHeightOffset = 40; // 与墙壁高度一致
-            
-            // 四个平屋顶角
-            const r1 = { x: p1.x, y: p1.y - roofHeightOffset };
-            const r2 = { x: p2.x, y: p2.y - roofHeightOffset };
-            const r3 = { x: p3.x, y: p3.y - roofHeightOffset };
-            const r4 = { x: p4.x, y: p4.y - roofHeightOffset };
+            // 转换为屏幕坐标
+            const p1 = this.getScreenXY(x1, y1, cameraX, cameraY);
+            const p2 = this.getScreenXY(x2, y1, cameraX, cameraY);
+            const p3 = this.getScreenXY(x2, y2, cameraX, cameraY);
+            const p4 = this.getScreenXY(x1, y2, cameraX, cameraY);
             
             ctx.save();
             ctx.globalAlpha = alpha;
             
-            // 平顶主体
+            // 平顶！直接盖在墙体顶部（墙高42）
             ctx.fillStyle = '#5d4037';
             ctx.beginPath();
-            ctx.moveTo(r1.x, r1.y);
-            ctx.lineTo(r2.x, r2.y);
-            ctx.lineTo(r3.x, r3.y);
-            ctx.lineTo(r4.x, r4.y);
+            ctx.moveTo(p1.x, p1.y - 42);
+            ctx.lineTo(p2.x, p2.y - 42);
+            ctx.lineTo(p3.x, p3.y - 42);
+            ctx.lineTo(p4.x, p4.y - 42);
             ctx.closePath();
             ctx.fill();
             
+            // 屋顶边缘
             ctx.strokeStyle = '#3e2723';
             ctx.lineWidth = 2;
             ctx.stroke();
-            
-            // 烟囱
-            ctx.fillStyle = '#795548';
-            const chimneyX = r1.x + (r2.x - r1.x) * 0.3;
-            const chimneyY = r1.y - 15;
-            ctx.fillRect(chimneyX - 5, chimneyY, 10, 20);
-            ctx.strokeStyle = '#4e342e';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(chimneyX - 5, chimneyY, 10, 20);
             
             ctx.restore();
         }
@@ -678,24 +611,22 @@ class Map {
             const tileX = point.x / this.tileSize;
             const tileY = point.y / this.tileSize;
             
-            const isoX = (tileX - tileY) * (this.tileSize / 2);
-            const isoY = (tileX + tileY) * (this.tileHeight / 2);
+            const screen = this.getScreenXY(tileX, tileY, cameraX, cameraY);
             
-            const screenX = isoX - cameraX + CONFIG.CANVAS_WIDTH / 2;
-            const screenY = isoY - cameraY + CONFIG.CANVAS_HEIGHT / 2;
-            
+            // 绘制菱形撤离点
             ctx.beginPath();
-            ctx.moveTo(screenX, screenY - this.tileHeight);
-            ctx.lineTo(screenX + this.tileSize, screenY);
-            ctx.lineTo(screenX, screenY + this.tileHeight);
-            ctx.lineTo(screenX - this.tileSize, screenY);
+            ctx.moveTo(screen.x, screen.y - this.tileHeight);
+            ctx.lineTo(screen.x + this.tileSize, screen.y);
+            ctx.lineTo(screen.x, screen.y + this.tileHeight);
+            ctx.lineTo(screen.x - this.tileSize, screen.y);
             ctx.closePath();
             ctx.fill();
             
+            // 撤离点文字
             ctx.fillStyle = '#fff';
             ctx.font = '16px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('撤离点', screenX, screenY + 5);
+            ctx.fillText('撤离点', screen.x, screen.y + 5);
         });
     }
 }
