@@ -5,12 +5,11 @@ class Map {
         this.tileSize = CONFIG.TILE_SIZE;
         this.tileHeight = CONFIG.TILE_HEIGHT;
         
-        // 地图数据：0=草地, 1=墙, 2=树, 3=石头, 4=水, 5=建筑地板
+        // 地图数据：0=草地, 1=墙, 2=树, 3=石头, 4=水, 5=建筑地板, 6=门
         this.tiles = [];
         this.walls = [];
         this.buildings = [];
         this.extractionPoints = [];
-        this.exploredTiles = new Set();
         
         this.initializeEmptyMap();
         this.generateNaturalTerrain();
@@ -125,7 +124,11 @@ class Map {
                         y: startY * this.tileSize,
                         width: templateWidth * this.tileSize,
                         height: templateHeight * this.tileSize,
-                        explored: false,
+                        startTileX: startX,
+                        startTileY: startY,
+                        endTileX: startX + templateWidth,
+                        endTileY: startY + templateHeight,
+                        entered: false, // 玩家是否进入过
                         template: template
                     });
                     placed = true;
@@ -136,7 +139,7 @@ class Map {
         }
     }
     
-    // 小木屋模板
+    // 小木屋模板（6x6）
     createSmallHouseTemplate() {
         return [
             [1,1,1,1,1,1],
@@ -144,11 +147,11 @@ class Map {
             [1,5,5,5,5,1],
             [1,5,5,5,5,1],
             [1,5,5,5,5,1],
-            [1,1,1,0,1,1]
+            [1,1,1,6,1,1] // 6=门
         ];
     }
     
-    // 大仓库模板
+    // 大仓库模板（8x8）
     createWarehouseTemplate() {
         return [
             [1,1,1,1,1,1,1,1],
@@ -158,11 +161,11 @@ class Map {
             [1,5,5,1,1,5,5,1],
             [1,5,5,5,5,5,5,1],
             [1,5,5,5,5,5,5,1],
-            [1,1,1,0,0,1,1,1]
+            [1,1,1,6,6,1,1,1] // 双开门
         ];
     }
     
-    // 两层楼房模板
+    // 两层楼房模板（8x10）
     createTwoStoryHouseTemplate() {
         return [
             [1,1,1,1,1,1,1,1],
@@ -174,7 +177,7 @@ class Map {
             [1,5,5,5,5,5,5,1],
             [1,5,5,5,5,5,5,1],
             [1,5,5,1,1,5,5,1],
-            [1,1,1,0,0,1,1,1]
+            [1,1,1,6,6,1,1,1]
         ];
     }
     
@@ -200,6 +203,7 @@ class Map {
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
                 const tile = this.tiles[y][x];
+                // 墙、树、石头、水都是碰撞体，门不是
                 if (tile === 1 || tile === 2 || tile === 3 || tile === 4) {
                     this.walls.push({
                         x: x * this.tileSize,
@@ -245,35 +249,34 @@ class Map {
         }
     }
     
-    // 碰撞检测（保持原逻辑不变）
+    // 碰撞检测
     isColliding(rect) {
         return this.walls.some(wall => rectCollision(rect, wall));
     }
     
-    // 更新探索区域
-    updateExploredArea(playerX, playerY) {
-        const playerTileX = Math.floor(playerX / this.tileSize);
-        const playerTileY = Math.floor(playerY / this.tileSize);
-        
+    // 检测玩家是否在建筑内
+    updatePlayerInBuilding(playerX, playerY) {
         for (const building of this.buildings) {
-            if (playerX > building.x && playerX < building.x + building.width &&
-                playerY > building.y && playerY < building.y + building.height) {
-                const startTileX = Math.floor(building.x / this.tileSize);
-                const startTileY = Math.floor(building.y / this.tileSize);
-                const endTileX = Math.floor((building.x + building.width) / this.tileSize);
-                const endTileY = Math.floor((building.y + building.height) / this.tileSize);
-                
-                for (let y = startTileY; y < endTileY; y++) {
-                    for (let x = startTileX; x < endTileX; x++) {
-                        this.exploredTiles.add(`${x},${y}`);
-                    }
-                }
-                building.explored = true;
+            const wasEntered = building.entered;
+            building.entered = (
+                playerX > building.x && playerX < building.x + building.width &&
+                playerY > building.y && playerY < building.y + building.height
+            );
+            
+            // 如果玩家刚进入建筑，生成内部敌人和物品
+            if (building.entered && !wasEntered) {
+                this.generateBuildingContent(building);
             }
         }
     }
     
-    // 绘制等轴测地图
+    // 生成建筑内部内容（敌人和物品）
+    generateBuildingContent(building) {
+        // 这里可以添加建筑内部生成敌人和物品的逻辑
+        // 暂时留空，后续可以扩展
+    }
+    
+    // 绘制等轴测地图地面
     draw(ctx, cameraX, cameraY) {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
@@ -342,12 +345,19 @@ class Map {
                 ctx.strokeStyle = '#bcaaa4';
                 ctx.stroke();
                 break;
+                
+            case 6: // 门
+                ctx.fillStyle = '#d7ccc8';
+                ctx.fill();
+                ctx.strokeStyle = '#bcaaa4';
+                ctx.stroke();
+                break;
         }
         
         ctx.restore();
     }
     
-    // 绘制立体物体（树、石头、建筑）
+    // 绘制所有立体物体（树、石头、建筑）
     drawObjects(ctx, cameraX, cameraY) {
         const cols = Math.floor(this.width / this.tileSize);
         const rows = Math.floor(this.height / this.tileSize);
@@ -366,28 +376,22 @@ class Map {
                 
                 const tile = this.tiles[y][x];
                 
-                // 检查是否是未探索的室内区域
-                let isUnexploredIndoor = false;
+                // 检查这个瓦片是否在已进入的建筑内
+                let inEnteredBuilding = false;
+                let buildingAlpha = 1;
                 for (const building of this.buildings) {
-                    const buildingStartX = Math.floor(building.x / this.tileSize);
-                    const buildingStartY = Math.floor(building.y / this.tileSize);
-                    const buildingEndX = Math.floor((building.x + building.width) / this.tileSize);
-                    const buildingEndY = Math.floor((building.y + building.height) / this.tileSize);
-                    
-                    if (x >= buildingStartX && x < buildingEndX &&
-                        y >= buildingStartY && y < buildingEndY &&
-                        !building.explored) {
-                        isUnexploredIndoor = true;
+                    if (x >= building.startTileX && x < building.endTileX &&
+                        y >= building.startTileY && y < building.endTileY) {
+                        inEnteredBuilding = building.entered;
+                        buildingAlpha = building.entered ? 0.5 : 1;
                         break;
                     }
                 }
                 
-                if (isUnexploredIndoor) continue;
-                
                 // 绘制立体物体
                 switch (tile) {
                     case 1: // 墙
-                        this.drawWall(ctx, screenX, screenY);
+                        this.drawWall(ctx, screenX, screenY, buildingAlpha);
                         break;
                         
                     case 2: // 树
@@ -397,18 +401,23 @@ class Map {
                     case 3: // 石头
                         this.drawRock(ctx, screenX, screenY);
                         break;
+                        
+                    case 6: // 门
+                        this.drawDoor(ctx, screenX, screenY, buildingAlpha);
+                        break;
                 }
             }
         }
         
-        // 绘制建筑屋顶（在所有物体之后）
+        // 绘制建筑屋顶
         this.drawBuildingRoofs(ctx, cameraX, cameraY);
     }
     
-    // 绘制立体墙
-    drawWall(ctx, x, y) {
+    // 绘制立体墙（支持透明度）
+    drawWall(ctx, x, y, alpha = 1) {
         ctx.save();
         ctx.translate(x, y);
+        ctx.globalAlpha = alpha;
         
         // 墙的高度
         const wallHeight = 40;
@@ -441,6 +450,31 @@ class Map {
         ctx.lineTo(0, this.tileHeight - wallHeight);
         ctx.lineTo(-this.tileSize / 2, this.tileHeight / 2 - wallHeight);
         ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+    }
+    
+    // 绘制门（支持透明度）
+    drawDoor(ctx, x, y, alpha = 1) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.globalAlpha = alpha;
+        
+        const doorHeight = 50;
+        
+        // 门框
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(-12, -doorHeight, 24, doorHeight);
+        
+        // 门板
+        ctx.fillStyle = '#795548';
+        ctx.fillRect(-10, -doorHeight + 2, 20, doorHeight - 2);
+        
+        // 门把手
+        ctx.fillStyle = '#ffc107';
+        ctx.beginPath();
+        ctx.arc(6, -doorHeight / 2, 2, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.restore();
@@ -507,32 +541,26 @@ class Map {
         ctx.restore();
     }
     
-    // 绘制建筑屋顶
+    // 绘制建筑屋顶（支持半透明）
     drawBuildingRoofs(ctx, cameraX, cameraY) {
         for (const building of this.buildings) {
-            if (building.explored) continue; // 已探索的建筑不显示屋顶
+            const alpha = building.entered ? 0.3 : 1; // 进入后屋顶更透明
             
-            const startTileX = Math.floor(building.x / this.tileSize);
-            const startTileY = Math.floor(building.y / this.tileSize);
-            const endTileX = Math.floor((building.x + building.width) / this.tileSize);
-            const endTileY = Math.floor((building.y + building.height) / this.tileSize);
-            
-            // 计算建筑中心的等轴测坐标
-            const centerX = (startTileX + endTileX) / 2;
-            const centerY = (startTileY + endTileY) / 2;
+            const centerX = (building.startTileX + building.endTileX) / 2;
+            const centerY = (building.startTileY + building.endTileY) / 2;
             const iso = cartesianToIsometric(centerX, centerY);
             const screenX = iso.x - cameraX + CONFIG.CANVAS_WIDTH / 2;
             const screenY = iso.y - cameraY + CONFIG.CANVAS_HEIGHT / 2;
             
-            // 建筑尺寸
-            const width = (endTileX - startTileX) * this.tileSize / 2;
-            const height = (endTileY - startTileY) * this.tileHeight / 2;
+            const width = (building.endTileX - building.startTileX) * this.tileSize / 2;
+            const height = (building.endTileY - building.startTileY) * this.tileHeight / 2;
             const roofHeight = 60;
             
             ctx.save();
             ctx.translate(screenX, screenY);
+            ctx.globalAlpha = alpha;
             
-            // 绘制屋顶
+            // 绘制屋顶主体
             ctx.fillStyle = '#5d4037';
             ctx.beginPath();
             ctx.moveTo(0, -roofHeight);
@@ -547,9 +575,17 @@ class Map {
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // 绘制门的标记
+            // 屋顶细节：屋脊
+            ctx.strokeStyle = '#4e342e';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, -roofHeight);
+            ctx.lineTo(0, height * 2 - roofHeight);
+            ctx.stroke();
+            
+            // 屋顶烟囱
             ctx.fillStyle = '#795548';
-            ctx.fillRect(-10, height - 10, 20, 20);
+            ctx.fillRect(-width/3, -roofHeight - 15, 10, 20);
             
             ctx.restore();
         }
